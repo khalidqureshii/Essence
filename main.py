@@ -20,8 +20,7 @@ advisory_system = None
 
 class ChatRequest(BaseModel):
     message: str
-    language: str
-
+    
 @app.post("/chatbot")
 async def chatbot_endpoint(request: ChatRequest):
     print(f"Received chatbot request: {request}")
