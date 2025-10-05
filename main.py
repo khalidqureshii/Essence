@@ -2,6 +2,7 @@ import logging
 from chatbot import chat
 from fastapi import FastAPI, HTTPException  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore
+import uvicorn  # type: ignore
 
 app = FastAPI(title="Crop Disease Detection API")
 app.add_middleware(
@@ -27,3 +28,7 @@ async def chatbot_endpoint(message: str):
         return {"success": True, "reply": bot_reply}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Chatbot error: {str(e)}")
+    
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
