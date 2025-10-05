@@ -13,7 +13,7 @@ history = [
 ]
 
 
-def chat(user_input: str, language: str):
+def chat(user_input: str):
     global history
     SYSTEM_PROMPT = f"""
         You are Essence - an Agentic Critic, a large language model trained by Google.
