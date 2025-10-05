@@ -1,0 +1,13 @@
+google-genai
+openai
+ipython
+uvicorn
+fastapi
+python-multipart
+python-dotenv
+rasterio
+pandas
+numpy
+requests
+scikit-learn
+pydantic
