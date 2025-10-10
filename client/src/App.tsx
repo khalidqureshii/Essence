@@ -53,7 +53,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white overflow-hidden">
+    <div className="h-screen w-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white overflow-hidden">
       {/* Header */}
       <header className="p-4 text-center border-b border-gray-700 shadow-md flex-shrink-0">
         <h1 className="text-2xl font-bold text-teal-400">
