@@ -35,7 +35,7 @@ def chat(user_input: str):
 
     # Send request to Gemini
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3-flash-preview",
         contents=SYSTEM_PROMPT + "\n\nConversation:\n" + conversation,
     )
 
