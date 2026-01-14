@@ -1,6 +1,11 @@
-google-genai
 fastapi
-python-dotenv
-python-multipart
 uvicorn
+python-dotenv
 pydantic
+langchain
+langchain-groq
+langchain-core
+openai-whisper
+httpx
+python-multipart
+google-genai

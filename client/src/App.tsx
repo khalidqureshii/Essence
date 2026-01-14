@@ -1,13 +1,14 @@
 import React, { useState, useRef, useEffect } from "react";
 import ChatMessage from "./components/ChatMessage";
 import MessageInput from "./components/MessageInput";
+import { API_BASE_URL } from "./config";
 
 interface Message {
   sender: "user" | "bot";
   text: string;
 }
 
-const API_URL = "https://essence-gf00.onrender.com/chatbot";
+const API_URL = `${API_BASE_URL}/chatbot/stream`;
 
 const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
@@ -23,23 +24,66 @@ const App: React.FC = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   useEffect(scrollToBottom, [messages]);
 
-  const sendMessage = async (text: string) => {
-    if (!text.trim()) return;
-    const userMessage: Message = { sender: "user", text };
+  const speak = (text: string) => {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const sendMessage = async (text: string, audioBlob?: Blob, screenshot?: string) => {
+    if (!text.trim() && !audioBlob && !screenshot) return;
+
+    const userMessage: Message = { sender: "user", text: text || (audioBlob ? "[Audio Message]" : "[Screen Capture]") };
     setMessages((prev) => [...prev, userMessage]);
     setLoading(true);
 
     try {
+      const formData = new FormData();
+      if (text) formData.append("text", text);
+      if (audioBlob) formData.append("audio", audioBlob, "audio.wav");
+      if (screenshot) formData.append("image", screenshot.split(',')[1]); // Base64 after comma
+
       const response = await fetch(API_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
+        body: formData,
       });
 
-      const data = await response.json();
-      const botReply = data.reply || "Sorry, I couldn’t understand that.";
-      setMessages((prev) => [...prev, { sender: "bot", text: botReply }]);
-    } catch {
+      if (!response.body) throw new Error("No response body");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let botText = "";
+      let hasStartedSpeaking = false;
+
+      // Add placeholder bot message
+      setMessages((prev) => [...prev, { sender: "bot", text: "" }]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        botText += chunk;
+
+        // Update last message
+        setMessages((prev) => {
+          const newMessages = [...prev];
+          newMessages[newMessages.length - 1].text = botText;
+          return newMessages;
+        });
+
+        // Trigger TTS logic
+        if (!hasStartedSpeaking && botText.includes("QUESTION:") && botText.includes("REASONING:")) {
+          const questionMatch = botText.match(/QUESTION: (.*?)\n/s);
+          if (questionMatch && questionMatch[1]) {
+            speak(questionMatch[1]);
+            hasStartedSpeaking = true;
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Stream error:", err);
       setMessages((prev) => [
         ...prev,
         {
@@ -79,9 +123,8 @@ const App: React.FC = () => {
         <div ref={chatEndRef} />
       </main>
 
-      {/* Message Input (fixed at bottom) */}
       <footer className="p-4 border-t border-gray-700 bg-gray-900 flex-shrink-0">
-        <MessageInput onSend={sendMessage} />
+        <MessageInput onSend={sendMessage} disabled={loading} />
       </footer>
     </div>
   );
