@@ -64,12 +64,17 @@ const MessageInput: React.FC<MessageInputProps> = ({
     if (!pipAPI) return;
 
     try {
-      const pip = await pipAPI.requestWindow({ width: 150, height: 100 });
+      const pip = await pipAPI.requestWindow({ width: 280, height: 100 });
 
-      // Copy basic styles to PiP window
+      // Copy all styles from main window to PiP window to ensure Tailwind works
+      [...document.head.querySelectorAll('style, link[rel="stylesheet"]')].forEach((element) => {
+        pip.document.head.appendChild(element.cloneNode(true));
+      });
+
+      // Force specific body style for layout
       const style = pip.document.createElement("style");
       style.textContent = `
-        body { margin: 0; background: #111827; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        body { margin: 0; background: #111827; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
       `;
       pip.document.head.appendChild(style);
 
@@ -87,15 +92,43 @@ const MessageInput: React.FC<MessageInputProps> = ({
   };
 
   const renderPiPContent = () => (
-    <div className='bg-gray-900 h-full w-full flex items-center justify-center'>
-      {/* Only Camera logic as requested */}
+    <div className='bg-gray-900 h-full w-full flex items-center justify-center space-x-2'>
+      {/* Camera Button */}
       <button
         onClick={onCameraClick}
-        className="bg-teal-500 hover:bg-teal-400 p-4 rounded-full text-white shadow-lg transform active:scale-95 transition-all"
+        className="bg-teal-500 hover:bg-teal-400 p-2 rounded-full text-white shadow-lg transform active:scale-95 transition-all"
         title="Take Screenshot"
       >
-        <Camera size={28} />
+        <Camera size={20} />
       </button>
+
+      {/* Mic / Recording Controls */}
+      {isRecording ? (
+        <>
+          <button
+            onClick={onCancelRecording}
+            className="p-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-red-400 rounded-full transition-colors"
+            title="Cancel"
+          >
+            <span className="font-bold text-lg leading-none">✕</span>
+          </button>
+          <button
+            onClick={onSend}
+            className="p-2 text-white bg-red-600 hover:bg-red-500 rounded-full shadow-lg animate-pulse transition-all"
+            title="Stop & Send"
+          >
+            <Square size={16} fill="currentColor" />
+          </button>
+        </>
+      ) : (
+        <button
+          onClick={onMicClick}
+          className="bg-gray-700 hover:bg-gray-600 p-2 rounded-full text-white shadow-lg transition-all"
+          title="Start Recording"
+        >
+          <Mic size={20} />
+        </button>
+      )}
     </div>
   );
 
