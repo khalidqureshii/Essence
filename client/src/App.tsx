@@ -24,9 +24,19 @@ const App: React.FC = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   useEffect(scrollToBottom, [messages]);
 
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
   const speak = (text: string) => {
     if ('speechSynthesis' in window) {
+      // Cancel any current speech
+      window.speechSynthesis.cancel();
+
       const utterance = new SpeechSynthesisUtterance(text);
+
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+
       window.speechSynthesis.speak(utterance);
     }
   };
@@ -124,7 +134,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="p-4 border-t border-gray-700 bg-gray-900 flex-shrink-0">
-        <MessageInput onSend={sendMessage} disabled={loading} />
+        <MessageInput onSend={sendMessage} disabled={loading} isBotSpeaking={isSpeaking} />
       </footer>
     </div>
   );

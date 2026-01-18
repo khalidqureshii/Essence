@@ -1,14 +1,55 @@
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Camera, Mic, Send, Square, X, ExternalLink } from "lucide-react";
+import { Camera, Mic, Send, Square, X, ExternalLink, MicVocal } from "lucide-react";
+
+// Speech Recognition Types
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  [index: number]: { transcript: string; confidence: number };
+}
+
+interface SpeechRecognitionEvent {
+  results: {
+    [index: number]: SpeechRecognitionResult;
+    length: number;
+    item(index: number): SpeechRecognitionResult;
+  };
+  resultIndex: number;
+}
+
+interface SpeechRecognitionErrorEvent {
+  error: string;
+  message: string;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onresult: (event: SpeechRecognitionEvent) => void;
+  onerror: (event: SpeechRecognitionErrorEvent) => void;
+  onend: () => void;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognition;
+    webkitSpeechRecognition: new () => SpeechRecognition;
+  }
+}
+
 
 
 interface MessageInputProps {
   onSend: (message: string, audioBlob?: Blob, screenshot?: string) => void;
   disabled?: boolean;
+  isBotSpeaking?: boolean;
 }
 
-const MessageInput: React.FC<MessageInputProps> = ({ onSend, disabled }) => {
+const MessageInput: React.FC<MessageInputProps> = ({ onSend, disabled, isBotSpeaking }) => {
   const [message, setMessage] = useState<string>("");
   const [isRecording, setIsRecording] = useState(false);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
@@ -17,6 +58,90 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSend, disabled }) => {
   const audioChunksRef = useRef<Blob[]>([]);
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
   const pipVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Voice Automation State
+  const [listeningForWakeWord, setListeningForWakeWord] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  // Initialize Speech Recognition
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      recognition.stop();
+    };
+  }, []);
+
+  // Handle Voice Commands logic
+  useEffect(() => {
+    const recognition = recognitionRef.current;
+
+    // Stop listening if dependencies are missing or bot is speaking
+    if (!recognition || !screenStream || isBotSpeaking) {
+      if (listeningForWakeWord) {
+        recognition?.stop();
+        setListeningForWakeWord(false);
+      }
+      return;
+    }
+
+    if (!listeningForWakeWord) {
+      try {
+        recognition.start();
+        setListeningForWakeWord(true);
+      } catch (e) {
+        // Recognition might already be started
+      }
+    }
+
+    recognition.onresult = (event) => {
+      const current = event.resultIndex;
+      const transcript = event.results[current][0].transcript.trim().toLowerCase();
+      console.log("Voice command detected:", transcript);
+
+      // Wake word: "Essence"
+      if (!isRecording && transcript.includes("essence")) {
+        console.log("Wake word detected! Starting recording...");
+        startRecording();
+      }
+
+      // Stop word: "Over"
+      else if (isRecording && (transcript.includes("over") || transcript.endsWith("over"))) {
+        console.log("Stop word detected! Stopping recording...");
+        stopRecording();
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error:", event.error);
+      if (event.error === 'not-allowed') {
+        setListeningForWakeWord(false);
+      }
+    };
+
+    recognition.onend = () => {
+      // Auto-restart if we should still be listening
+      if (screenStream && !isBotSpeaking && listeningForWakeWord) {
+        try {
+          recognition.start();
+        } catch (e) {
+          // Ignore error if already started
+        }
+      } else {
+        setListeningForWakeWord(false);
+      }
+    };
+
+  }, [screenStream, isRecording, listeningForWakeWord, isBotSpeaking]);
+
 
   useEffect(() => {
     if (videoPreviewRef.current && screenStream) {
@@ -249,9 +374,20 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSend, disabled }) => {
             {isPiP ? 'Always-on-Top' : 'Live Capture Active'}
           </span>
         </div>
-        {isRecording && (
-          <span className="text-[10px] text-red-500 font-bold animate-pulse">REC</span>
-        )}
+        <div className="flex items-center space-x-3">
+          {listeningForWakeWord && !isRecording && (
+            <div className="flex items-center space-x-1.5 bg-black/40 px-2 py-0.5 rounded-md border border-teal-500/30">
+              <MicVocal size={12} className="text-teal-400 animate-pulse" />
+              <span className="text-[10px] text-teal-200">Say "Essence"</span>
+            </div>
+          )}
+          {isRecording && (
+            <div className="flex items-center space-x-1.5 animate-pulse">
+              <span className="text-[10px] text-red-400 font-bold uppercase">Say "Over" to stop</span>
+              <span className="text-[10px] text-red-500 font-bold">REC</span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
