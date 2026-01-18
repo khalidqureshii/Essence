@@ -5,9 +5,18 @@ import { API_BASE_URL } from "./config";
 import { Toaster, toast } from "react-hot-toast";
 
 interface Message {
+  id: string;
   sender: "user" | "bot";
   text: string;
   image?: string;
+  isFinal?: boolean;
+}
+
+// Global TTS reference to prevent Garbage Collection bugs
+declare global {
+  interface Window {
+    currentUtterance?: SpeechSynthesisUtterance | null;
+  }
 }
 
 // Derive WS URL from API_BASE_URL (http -> ws, https -> wss)
@@ -16,8 +25,10 @@ const WS_URL = API_BASE_URL.replace(/^http/, "ws") + "/chatbot/ws";
 const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
+      id: "init-1",
       sender: "bot",
       text: "Hi, I am Essence - your Agentic Critic. Say 'Essence' or click Mic to start.",
+      isFinal: true,
     },
   ]);
   const [status, setStatus] = useState<"INACTIVE" | "ACTIVE" | "RESPONDING">("INACTIVE");
@@ -26,6 +37,10 @@ const App: React.FC = () => {
   const [currentDraft, setCurrentDraft] = useState("");
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
+  const [speakingText, setSpeakingText] = useState<string | null>(null);
+  const [autoplayResponses, setAutoplayResponses] = useState(() => {
+    return localStorage.getItem("autoplayResponses") === "true";
+  });
 
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -91,9 +106,21 @@ const App: React.FC = () => {
 
           switch (data.type) {
             case "state_update":
-              if (data.payload.is_responding) setStatus("RESPONDING");
-              else if (data.payload.active) setStatus("ACTIVE");
-              else setStatus("INACTIVE");
+              if (data.payload.is_responding) {
+                setStatus("RESPONDING");
+              } else {
+                if (data.payload.active) setStatus("ACTIVE");
+                else setStatus("INACTIVE");
+
+                // Mark last bot message as final when responding stops
+                setMessages(prev => {
+                  const last = prev[prev.length - 1];
+                  if (last && last.sender === "bot" && !last.isFinal) {
+                    return [...prev.slice(0, -1), { ...last, isFinal: true }];
+                  }
+                  return prev;
+                });
+              }
               break;
 
             case "transcript_update":
@@ -112,7 +139,7 @@ const App: React.FC = () => {
                     { ...last, text: last.text + data.payload }
                   ];
                 } else {
-                  return [...prev, { sender: "bot", text: data.payload }];
+                  return [...prev, { id: crypto.randomUUID(), sender: "bot", text: data.payload }];
                 }
               });
               break;
@@ -130,6 +157,7 @@ const App: React.FC = () => {
               setMessages(prev => {
                 const displayText = data.payload.text || (data.payload.image ? "" : "🎤 (Audio Message)");
                 return [...prev, {
+                  id: crypto.randomUUID(),
                   sender: "user",
                   text: displayText,
                   image: data.payload.image
@@ -164,20 +192,6 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Separate effect to handle "trigger-screenshot" event to access latest closure?
-  // Or better: Use a Ref for the current WS instance, but handleScreenshot needs to send data.
-  // Actually, handleScreenshot uses `ws` from state.
-  // If we move command handling to a separate useEffect that depends on [ws, handleScreenshot], we are good.
-
-  // Let's REMOVE the command handling from the main WS setup and put it in a message queue or Ref?
-  // Alternative: Use a ref for handleScreenshot?
-  // `const handleScreenshotRef = useRef(handleScreenshot);`
-  // `useEffect(() => { handleScreenshotRef.current = handleScreenshot; });`
-  // Then call `handleScreenshotRef.current()` inside the closure. 
-  /* 
-     We will implement this Ref pattern to fix the stale closure issue.
-  */
-
   // Audio Recording (Continuous Logic)
   const startRecording = async () => {
     try {
@@ -186,7 +200,7 @@ const App: React.FC = () => {
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0 && ws && ws.readyState === WebSocket.OPEN) {
+        if (event.data.size > 0 && ws && ws.readyState === WebSocket.OPEN && !speakingText) {
           ws.send(event.data);
         }
       };
@@ -220,12 +234,8 @@ const App: React.FC = () => {
 
   const toggleMic = () => {
     if (isRecording) {
-      // User requested explicit "Stop & Send" and "Cancel".
-      // The Mic button will now only start recording.
-      // Stopping and committing/cancelling will be handled by dedicated buttons.
-      // For now, if mic is clicked while recording, it just stops without committing.
       stopRecording();
-      setStatus("INACTIVE"); // Assuming stopping mic makes turn inactive if no other input.
+      setStatus("INACTIVE");
     }
     else startRecording();
   };
@@ -316,10 +326,102 @@ const App: React.FC = () => {
     }
   };
 
-  const handleCommit = () => {
-    // Don't block local check! Backend manages the "Active Turn Context".
-    // If we have local text/image, we clear it, but we ALWAYS send commit if requested.
+  // Audio Controls - IMPERATIVE ARCHITECTURE
+  // We rely on window.currentUtterance instead of Ref to ensure GC safety across re-renders
 
+  const stopSpeaking = () => {
+    window.speechSynthesis.cancel();
+    setSpeakingText(null);
+    window.currentUtterance = null;
+  };
+
+  const speakResponse = (text: string) => {
+    // 1. Cancel existing
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+    }
+
+    if (!text) return;
+
+    // 2. Create Utterance
+    const utterance = new SpeechSynthesisUtterance(text);
+    window.currentUtterance = utterance; // SUPER STRONG GC protection
+
+    // 3. Bind Events (Update State)
+    utterance.onstart = () => {
+      setSpeakingText(text);
+    };
+    utterance.onend = () => {
+      setSpeakingText(null);
+      window.currentUtterance = null;
+    };
+    utterance.onerror = (e) => {
+      console.error("TTS error", e);
+      setSpeakingText(null);
+      window.currentUtterance = null;
+    };
+
+    // 4. Speak
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const handleManualMicClick = (text: string) => {
+    // UI Handler: Toggles state
+    if (speakingText === text) {
+      stopSpeaking();
+    } else {
+      speakResponse(text);
+    }
+  };
+
+  const lastAutoplayMessageIdRef = useRef<string | null>(null);
+
+  // Initialize lastAutoplayMessageIdRef to prevent playing old messages on load
+  useEffect(() => {
+    if (messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg) {
+        lastAutoplayMessageIdRef.current = lastMsg.id;
+      }
+    }
+  }, []); // Run once on mount
+
+  // Robust Autoplay Trigger (ID Based)
+  useEffect(() => {
+    const lastMsg = messages[messages.length - 1];
+
+    // 1. Completion Check (Wait for Explicit Finalization)
+    if (!lastMsg?.isFinal) {
+      return;
+    }
+
+    if (!autoplayResponses) return;
+
+    // 2. Validate it's a new Bot message
+    if (!lastMsg || lastMsg.sender !== "bot") return;
+
+    // 3. Idempotency Check (Stable ID)
+    if (lastAutoplayMessageIdRef.current === lastMsg.id) {
+      return;
+    }
+
+    // 4. Speak
+    speakResponse(lastMsg.text);
+
+    // 5. Update Ref
+    lastAutoplayMessageIdRef.current = lastMsg.id;
+
+  }, [status, autoplayResponses, messages]);
+
+  const toggleAutoplay = () => {
+    setAutoplayResponses(prev => {
+      const next = !prev;
+      localStorage.setItem("autoplayResponses", String(next));
+      return next;
+    });
+  };
+
+  const handleCommit = () => {
     if (currentDraft.trim() || pendingImage) {
       setCurrentDraft("");
       setPendingImage(null);
@@ -357,7 +459,18 @@ const App: React.FC = () => {
               <span className="text-xs text-red-400 font-bold tracking-wider">RECORDING</span>
             </div>
           ) : (
-            <div className="flex items-center">
+            <div className="flex items-center space-x-4">
+              <label className="flex items-center cursor-pointer space-x-2 group">
+                <input
+                  type="checkbox"
+                  checked={autoplayResponses}
+                  onChange={toggleAutoplay}
+                  className="form-checkbox h-4 w-4 text-teal-500 rounded border-gray-600 focus:ring-teal-500 focus:ring-offset-gray-900 bg-gray-800 transition-colors"
+                />
+                <span className="text-xs text-gray-400 font-medium uppercase tracking-wide group-hover:text-teal-400 transition-colors select-none">
+                  Auto-play
+                </span>
+              </label>
               <span className="text-xs text-gray-500 mr-2 uppercase tracking-wide">Ready</span>
             </div>
           )}
@@ -367,7 +480,14 @@ const App: React.FC = () => {
       {/* Chat Area (scrollable only here) */}
       <main className="flex-1 overflow-y-auto px-4 md:px-16 py-6 space-y-4 scrollbar-hide relative">
         {messages.map((msg, i) => (
-          <ChatMessage key={i} sender={msg.sender} text={msg.text} image={msg.image} />
+          <ChatMessage
+            key={i}
+            sender={msg.sender}
+            text={msg.text}
+            image={msg.image}
+            isPlaying={speakingText === msg.text}
+            onPlay={handleManualMicClick}
+          />
         ))}
         <div ref={chatEndRef} />
 
@@ -421,4 +541,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-
