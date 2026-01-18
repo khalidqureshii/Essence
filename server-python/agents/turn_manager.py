@@ -102,8 +102,6 @@ class TurnManager:
         # Prepare confirmation text with explicit "Audio:" tag if audio was a source
         # User requested: "Audio: Transcription of what I said"
         display_text = full_prompt
-        if self.context.sources.get("audio"):
-            display_text = f"Audio: {full_prompt}"
 
         # Send confirmation to client
         yield {

@@ -117,12 +117,6 @@ const App: React.FC = () => {
                   return prev;
                 });
               }
-
-              // 4️⃣ Log when a message is marked final (Status Change triggers completion)
-              console.log("MESSAGE FINALIZED (Status Change)", {
-                newStatus: data.payload.is_responding ? "RESPONDING" : (data.payload.active ? "ACTIVE" : "INACTIVE"),
-                messagesCount: messages.length
-              });
               break;
 
             case "transcript_update":
@@ -332,25 +326,18 @@ const App: React.FC = () => {
   // We rely on window.currentUtterance instead of Ref to ensure GC safety across re-renders
 
   const stopSpeaking = () => {
-    console.log("TTS DEBUG: Explicit Stop called");
     window.speechSynthesis.cancel();
     setSpeakingText(null);
     window.currentUtterance = null;
   };
 
   const speakResponse = (text: string) => {
-    console.log(`TTS DEBUG: speakResponse called. Length: ${text.length}. Content: "${text.substring(0, 50)}..."`);
-
     // 1. Cancel existing
     if (window.speechSynthesis.speaking) {
-      console.log("TTS DEBUG: Canceling previous speech");
       window.speechSynthesis.cancel();
     }
 
-    if (!text) {
-      console.warn("TTS DEBUG: Empty text, aborting.");
-      return;
-    }
+    if (!text) return;
 
     // 2. Create Utterance
     const utterance = new SpeechSynthesisUtterance(text);
@@ -358,37 +345,27 @@ const App: React.FC = () => {
 
     // 3. Bind Events (Update State)
     utterance.onstart = () => {
-      console.log("TTS DEBUG: onstart fired");
       setSpeakingText(text);
     };
     utterance.onend = () => {
-      console.log("TTS DEBUG: onend fired");
       setSpeakingText(null);
       window.currentUtterance = null;
     };
     utterance.onerror = (e) => {
-      console.error("TTS DEBUG: onerror fired", e);
+      console.error("TTS error", e);
       setSpeakingText(null);
       window.currentUtterance = null;
     };
 
     // 4. Speak
-    console.log("TTS DEBUG: calling window.speechSynthesis.speak");
     window.speechSynthesis.speak(utterance);
   };
 
   const handleManualMicClick = (text: string) => {
     // UI Handler: Toggles state
     if (speakingText === text) {
-      console.log("UI DEBUG: User clicked Stop");
       stopSpeaking();
     } else {
-      console.log("UI DEBUG: User clicked Listen");
-      // 2️⃣ Log the text used by the Listen button
-      console.log("MANUAL LISTEN TEXT", {
-        length: text.length,
-        preview: text.slice(0, 100),
-      });
       speakResponse(text);
     }
   };
@@ -409,19 +386,8 @@ const App: React.FC = () => {
   useEffect(() => {
     const lastMsg = messages[messages.length - 1];
 
-    console.log("AUTOPLAY CHECK:", {
-      status,
-      autoplayResponses,
-      hasLastMsg: !!lastMsg,
-      savedId: lastAutoplayMessageIdRef.current,
-      currentId: lastMsg?.id,
-      sender: lastMsg?.sender,
-      isFinal: lastMsg?.isFinal
-    });
-
     // 1. Completion Check (Wait for Explicit Finalization)
     if (!lastMsg?.isFinal) {
-      // console.log("AUTOPLAY DEBUG: Waiting for stream completion...", lastMsg.id);
       return;
     }
 
@@ -432,15 +398,10 @@ const App: React.FC = () => {
 
     // 3. Idempotency Check (Stable ID)
     if (lastAutoplayMessageIdRef.current === lastMsg.id) {
-      console.log("AUTOPLAY DEBUG: Skipping, already spoken", lastMsg.id);
       return;
     }
 
     // 4. Speak
-    // 1️⃣ Log the FULL message object used for autoplay
-    console.log("AUTOPLAY MESSAGE OBJECT", JSON.stringify(lastMsg, null, 2));
-
-    console.log("AUTOPLAY DEBUG: Triggering Speak for", lastMsg.id);
     speakResponse(lastMsg.text);
 
     // 5. Update Ref
@@ -514,25 +475,16 @@ const App: React.FC = () => {
 
       {/* Chat Area (scrollable only here) */}
       <main className="flex-1 overflow-y-auto px-4 md:px-16 py-6 space-y-4 scrollbar-hide relative">
-        {messages.map((msg, i) => {
-          // 3️⃣ Log the text rendered in the UI
-          if (msg.sender === 'bot' && i === messages.length - 1) {
-            console.log("UI RENDER TEXT", {
-              length: msg.text.length,
-              preview: msg.text.slice(0, 100),
-            });
-          }
-          return (
-            <ChatMessage
-              key={i}
-              sender={msg.sender}
-              text={msg.text}
-              image={msg.image}
-              isPlaying={speakingText === msg.text}
-              onPlay={handleManualMicClick}
-            />
-          );
-        })}
+        {messages.map((msg, i) => (
+          <ChatMessage
+            key={i}
+            sender={msg.sender}
+            text={msg.text}
+            image={msg.image}
+            isPlaying={speakingText === msg.text}
+            onPlay={handleManualMicClick}
+          />
+        ))}
         <div ref={chatEndRef} />
 
         {/* Context Preview Indicator - Always show if image pending or active */}
