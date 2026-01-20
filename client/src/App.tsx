@@ -3,6 +3,10 @@ import ChatMessage from "./components/ChatMessage";
 import MessageInput from "./components/MessageInput";
 import { API_BASE_URL } from "./config";
 import { Toaster, toast } from "react-hot-toast";
+import SpeechRecognition, {
+  useSpeechRecognition
+} from "react-speech-recognition";
+
 
 interface Message {
   id: string;
@@ -16,6 +20,8 @@ interface Message {
 declare global {
   interface Window {
     currentUtterance?: SpeechSynthesisUtterance | null;
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
   }
 }
 
@@ -27,7 +33,7 @@ const App: React.FC = () => {
     {
       id: "init-1",
       sender: "bot",
-      text: "Hi, I am Essence - your Agentic Critic. Say 'Essence' or click Mic to start.",
+      text: "Hi, I am Essence - your Agentic Critic. Say 'HelloEssence' or click Mic to start.",
       isFinal: true,
     },
   ]);
@@ -43,10 +49,15 @@ const App: React.FC = () => {
   });
 
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+const isStoppingRef = useRef(false); // NEW
+
+  
   const screenStreamRef = useRef<MediaStream | null>(null);
   // Ref to hold latest handleScreenshot to avoid stale closures in WS effect
   const handleScreenshotRef = useRef<((autoSend?: boolean) => Promise<void>) | null>(null);
+  const pendingCommitRef = useRef(false);
 
   const scrollToBottom = () =>
     chatEndRef.current?.scrollIntoView({ block: "end" }); // Removed smooth behavior for performance
@@ -124,10 +135,36 @@ const App: React.FC = () => {
               break;
 
             case "transcript_update":
-              setMessages(prev => {
-                return [...prev]; // Placeholder for now
-              });
-              console.log("Transcript Update:", data.payload);
+              if (data.payload) {
+                 const lower = data.payload.trim().toLowerCase();
+                 // Filter common Whisper hallucinations on silence
+                 const isHallucination = 
+                   lower === "thank you." || 
+                   lower === "thank you" || 
+                   lower === "you" ||
+                   lower === ".";
+                 
+                 if (!isHallucination) {
+                   console.log("✅ Valid Backend Transcript:", data.payload);
+                   setCurrentDraft(data.payload);
+                   
+                   // Delayed commit: If we were waiting for this text, commit now
+                   if (pendingCommitRef.current) {
+                      console.log("🚀 Triggering delayed commit");
+                      socket?.send(JSON.stringify({ type: "commit" }));
+                      pendingCommitRef.current = false;
+                      setCurrentDraft(""); // Clear after auto-commit
+                   }
+                 } else {
+                   console.warn("⚠️ Filtered Hallucination:", lower);
+                   // If we were waiting but got garbage, abort commit
+                   if (pendingCommitRef.current) {
+                      pendingCommitRef.current = false;
+                      setCurrentDraft("");
+                   }
+                 }
+              }
+              // console.log("Transcript Update:", data.payload); // reduced noise
               break;
 
             case "response_chunk":
@@ -192,32 +229,123 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Audio Recording (Continuous Logic)
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0 && ws && ws.readyState === WebSocket.OPEN && !speakingText) {
-          ws.send(event.data);
-        }
-      };
+//New Audio Recording code
 
-      mediaRecorder.start(1000); // 1-second chunks
-      setIsRecording(true);
-      setStatus("ACTIVE");
-    } catch (err) {
-      console.error("Mic Error:", err);
-    }
+const {
+  transcript,
+  resetTranscript
+} = useSpeechRecognition();
+
+useEffect(() => {
+  if (!SpeechRecognition.browserSupportsSpeechRecognition()) {
+    console.error("STT not supported");
+    return;
+  }
+
+  SpeechRecognition.startListening({
+    continuous: true,
+    language: "en-US"
+  });
+
+  return () => {
+    SpeechRecognition.stopListening();
   };
+}, []);
 
-  const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
-    mediaRecorderRef.current?.stream.getTracks().forEach(t => t.stop());
-    setIsRecording(false);
-  };
+useEffect(() => {
+  const text = transcript.toLowerCase().trim();
+  if (!text) return;
+
+  console.log("🎧 Transcript Update:", text);
+
+  // START: "hello essence"
+  if (
+    /\bhello essence\b/.test(text) &&
+    !isRecording
+  ) {
+    startRecording();
+    resetTranscript(); // important to avoid repeat trigger
+  }
+
+  // STOP: "over"
+  if (
+    /\bover\b/.test(text) &&
+    isRecording
+  ) {
+    stopRecording();
+    setTimeout(() => {
+    handleCommit();
+    resetTranscript();
+  }, 300); // 🔑 allow audio flush
+  }
+}, [transcript]);
+
+const startRecording = async () => {
+  try {
+    if (isRecording) return;
+    setCurrentDraft("");
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mediaRecorder = new MediaRecorder(stream);
+    mediaRecorderRef.current = mediaRecorder;
+
+    mediaRecorder.ondataavailable = async (event) => {
+      if (event.data.size <= 0) return;
+
+      // Send audio chunk
+      if (ws && ws.readyState === WebSocket.OPEN && !speakingText) {
+        ws.send(event.data);
+        // debug logging
+        event.data.arrayBuffer().then(buf =>
+          console.log("Sent chunk bytes:", buf.byteLength)
+        );
+      } else {
+        console.warn("Cannot send audio chunk: ws not open");
+      }
+
+      // If we are in stopping mode, this was the FINAL chunk.
+      // Trigger commit only AFTER this chunk has been sent.
+      if (isStoppingRef.current) {
+        isStoppingRef.current = false;
+
+        // Optional small delay to give the server socket loop time to append bytes
+        setTimeout(() => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            console.log("🔔 Sending commit to backend after final chunk");
+            ws.send(JSON.stringify({ type: "commit" }));
+          } else {
+            console.warn("Commit aborted: ws not open");
+          }
+        }, 120); // 100–300ms is fine; small to be safe
+      }
+    };
+
+    mediaRecorder.start(1000);
+    setIsRecording(true);
+    setStatus("ACTIVE");
+  } catch (err) {
+    console.error("Mic Error:", err);
+  }
+};
+
+
+const stopRecording = () => {
+  if (!mediaRecorderRef.current) return;
+
+  // Mark that we're stopping — the next ondataavailable will be final
+  isStoppingRef.current = true;
+
+  // Force final dataavailable event
+  mediaRecorderRef.current.requestData();
+
+  // Stop recording (final dataavailable fires before onstop)
+  mediaRecorderRef.current.stop();
+  mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
+
+  setIsRecording(false);
+};
+
+
 
   const cancelRecording = () => {
     stopRecording();
@@ -232,13 +360,20 @@ const App: React.FC = () => {
     handleCommit();
   };
 
-  const toggleMic = () => {
-    if (isRecording) {
-      stopRecording();
-      setStatus("INACTIVE");
-    }
-    else startRecording();
-  };
+const toggleMic = () => {
+  if (isRecording) {
+    stopRecording();
+    setStatus("INACTIVE");
+  } else {
+    startRecording();
+  }
+};
+
+  const actionsRef = useRef({ isRecording, startRecording, finishRecording });
+  useEffect(() => {
+    actionsRef.current = { isRecording, startRecording, finishRecording };
+  }, [isRecording, startRecording, finishRecording]);
+
 
   // Image Input
   const handleScreenshot = async (autoSend: boolean = false) => {
@@ -304,12 +439,15 @@ const App: React.FC = () => {
         reader.onload = (event) => {
           if (ws && ws.readyState === WebSocket.OPEN && event.target?.result) {
             const imgStr = event.target.result as string;
+            console.log("Paste Image Data:", imgStr.substring(0, 50) + "...", imgStr.length);
             setPendingImage(imgStr); // Update UI preview
             ws.send(JSON.stringify({
               type: "image_input",
               image: imgStr,
               source: "pasted"
             }));
+          } else {
+             console.warn("WS not ready or paste failed");
           }
         };
         if (blob) reader.readAsDataURL(blob);
@@ -422,6 +560,35 @@ const App: React.FC = () => {
   };
 
   const handleCommit = () => {
+    // Also filter hallucinations at commit time just in case
+    const lower = currentDraft.trim().toLowerCase();
+    const isHallucination = 
+        lower === "thank you." || 
+        lower === "thank you" || 
+        lower === "you" ||
+        lower === ".";
+
+    // If hallucination, clear and abort
+    if (isHallucination) {
+      setCurrentDraft("");
+      return;
+    }
+
+    // If empty and no image, WAIT for potential backend transcript (latency)
+    if (!currentDraft.trim() && !pendingImage) {
+      console.log("Empty draft, waiting for transcript...");
+      pendingCommitRef.current = true;
+      // Safety timeout: If no transcript arrives in 3s, abort
+      setTimeout(() => {
+        if (pendingCommitRef.current) {
+           console.log("Commit timeout - no transcript arrived.");
+           pendingCommitRef.current = false;
+        }
+      }, 3000);
+      return;
+    }
+
+    // Normal commit
     if (currentDraft.trim() || pendingImage) {
       setCurrentDraft("");
       setPendingImage(null);
@@ -496,9 +663,11 @@ const App: React.FC = () => {
           <div className="fixed bottom-24 right-4 flex flex-col items-end space-y-2 animate-in fade-in slide-in-from-bottom-2 z-50">
             {pendingImage && (
               <div className="relative group">
+                 {/* {console.log("Rendering pendingImage:", pendingImage.substring(0,20), pendingImage.length)} */}
                 <img
                   src={pendingImage}
                   alt="Pending Context"
+                  onError={(e) => console.error("Image load error", e)}
                   className="w-24 h-auto rounded-lg border-2 border-teal-500/50 shadow-lg object-cover bg-gray-900"
                 />
                 <div className="absolute -top-2 -right-2 bg-teal-500 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full z-10">
@@ -522,6 +691,7 @@ const App: React.FC = () => {
             if (isRecording) finishRecording();
             else handleCommit();
           }}
+          value={currentDraft} // Controlled input
           onInputChange={(text) => handleSendText(text)}
           onMicClick={toggleMic}
           onCameraClick={handleScreenshot}

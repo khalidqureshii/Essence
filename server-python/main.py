@@ -44,6 +44,7 @@ async def websocket_endpoint(websocket: WebSocket):
     
     turn_manager = TurnManager(orchestrator, stt_agent)
     logger.info("WebSocket connected. TurnManager initialized.")
+    audio_buffer = bytearray()
 
     try:
         while True:
@@ -75,8 +76,28 @@ async def websocket_endpoint(websocket: WebSocket):
                         await turn_manager.handle_image_input(payload.get("image", ""), payload.get("source", "pasted"))
                         
                     elif event_type == "commit":
+                        logger.info("🔔 Commit received, transcribing audio")
+
+                        audio_bytes = bytes(audio_buffer)
+                        audio_buffer.clear()
+
+                        logger.info(f"🎧 Audio buffer size: {len(audio_bytes)} bytes")
+
+                        if audio_bytes:
+                            transcript = await stt_agent.transcribe_bytes(audio_bytes)
+
+                            if transcript:
+                                async for response in turn_manager.process_text_input(
+                                    transcript,
+                                    source="audio",
+                                    mode="replace"
+                                ):
+                                    await websocket.send_json(response)
+
+                        # Then finalize the turn
                         async for response in turn_manager.handle_commit():
                             await websocket.send_json(response)
+
                             
                     elif event_type == "reset":
                          turn_manager.context.reset()
@@ -96,29 +117,32 @@ async def websocket_endpoint(websocket: WebSocket):
 
             if "bytes" in message:
                 audio_data = message["bytes"]
-                # Process audio chunk
-                # In a real implementation, we'd transcribe here.
-                # Since STT is currently file-based or slow-ish, we might need a workaround.
-                # But complying with the requested architecture:
+                audio_buffer.extend(audio_data)
+            # if "bytes" in message:
+            #     audio_data = message["bytes"]
+            #     # Process audio chunk
+            #     # In a real implementation, we'd transcribe here.
+            #     # Since STT is currently file-based or slow-ish, we might need a workaround.
+            #     # But complying with the requested architecture:
                 
-                # 1. Transcribe (simulated buffering or direct call if STT supports bytes)
-                # We need to add `transcribe_bytes` to STT agent or save to temp.
-                # Let's save to temp for now to reuse existing STT.
+            #     # 1. Transcribe (simulated buffering or direct call if STT supports bytes)
+            #     # We need to add `transcribe_bytes` to STT agent or save to temp.
+            #     # Let's save to temp for now to reuse existing STT.
                 
-                # Optimisation: Only transcribe every N chunks or 1-2 seconds?
-                # For "One coherent pass", let's transcribe every chunk if it's large enough?
-                # Better: Queue it and background task transcribe?
-                # User said "Continuously transcribe speech".
+            #     # Optimisation: Only transcribe every N chunks or 1-2 seconds?
+            #     # For "One coherent pass", let's transcribe every chunk if it's large enough?
+            #     # Better: Queue it and background task transcribe?
+            #     # User said "Continuously transcribe speech".
                 
-                # For this implementation to be "simple" and "correct" on semantics:
-                # We will perform transcription.
+            #     # For this implementation to be "simple" and "correct" on semantics:
+            #     # We will perform transcription.
                 
-                transcript_segment = await stt_agent.transcribe_bytes(audio_data)
-                if transcript_segment:
-                    async for response in turn_manager.process_text_input(transcript_segment, source="audio"):
-                        await websocket.send_json(response)
-                        # If the response was a command (capture), sending it back allows client to act.
-                        # If it was a commit response stream, we sent it.
+            #     transcript_segment = await stt_agent.transcribe_bytes(audio_data)
+            #     if transcript_segment:
+            #         async for response in turn_manager.process_text_input(transcript_segment, source="audio"):
+            #             await websocket.send_json(response)
+            #             # If the response was a command (capture), sending it back allows client to act.
+            #             # If it was a commit response stream, we sent it.
 
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected")
