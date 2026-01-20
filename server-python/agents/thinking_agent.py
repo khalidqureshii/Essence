@@ -12,9 +12,9 @@ class ThinkingAgent:
             streaming=True
         )
 
-    async def stream_critique(self, transcript: str, image_data: Optional[str] = None, memory_context: str = "") -> AsyncIterable[str]:
-        # Prompt enforces QUESTION first, then REASONING
-        system_prompt = (
+    async def stream_critique(self, transcript: str, image_data: Optional[str] = None, memory_context: str = "", history: List[Dict] = [], custom_system_prompt: Optional[str] = None) -> AsyncIterable[str]:
+        # Default prompt if no custom logic provided
+        base_system_prompt = (
             "You are an Agentic Critique System. Your task is to analyze user input and optional UI screenshots.\n"
             "MANDATORY OUTPUT FORMAT:\n"
             "QUESTION: [The single most important question to ask next]\n"
@@ -25,6 +25,21 @@ class ThinkingAgent:
             "- Be concise and critical."
         )
 
+        system_prompt = custom_system_prompt if custom_system_prompt else base_system_prompt
+
+        messages = [SystemMessage(content=system_prompt)]
+        
+        # Add History
+        # history is expected to be list of langchain BaseMessages or dicts
+        # If they are dicts, convert? Or assume caller handles it?
+        # Let's assume caller sends proper LangChain messages or we just append them if they match.
+        # But `history` arg type hint says List[Dict] in my signature? 
+        # Plan said List[BaseMessage]. Let's support BaseMessage.
+        
+        if history:
+            messages.extend(history)
+
+        # Current Turn Input
         content = [{"type": "text", "text": f"Transcript: {transcript}\nMemory Context: {memory_context}"}]
         
         if image_data:
@@ -33,10 +48,7 @@ class ThinkingAgent:
                 "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}
             })
 
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=content)
-        ]
+        messages.append(HumanMessage(content=content))
 
         async for chunk in self.llm.astream(messages):
             if chunk.content:

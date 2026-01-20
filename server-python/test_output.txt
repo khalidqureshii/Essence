@@ -1,0 +1,5 @@
+Start State: ConversationState.PASSIVE_LISTENING
+After 'Here is code': ConversationState.PASSIVE_LISTENING
+After 'That's basically it': ConversationState.ALIGNMENT
+After 'Yes, exactly': ConversationState.KNOWLEDGE_GATHERING
+After 'Users are...': ConversationState.CROSS_QUESTIONING
