@@ -33,7 +33,7 @@ const App: React.FC = () => {
     {
       id: "init-1",
       sender: "bot",
-      text: "Hi, I am Essence - your Agentic Critic. Say 'Essence' or click Mic to start.",
+      text: "Hi, I am Essence - your Agentic Critic. Say 'HelloEssence' or click Mic to start.",
       isFinal: true,
     },
   ]);
@@ -225,92 +225,6 @@ const isStoppingRef = useRef(false); // NEW
     };
   }, []);
 
-  // Audio Recording (Continuous Logic)
-//   const recognitionRef = useRef(null);
-//   const startRecording = async () => {
-//     try {
-//       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-//       const mediaRecorder = new MediaRecorder(stream);
-//       mediaRecorderRef.current = mediaRecorder;
-
-//       mediaRecorder.ondataavailable = (event) => {
-//         if (event.data.size > 0 && ws && ws.readyState === WebSocket.OPEN && !speakingText) {
-//           ws.send(event.data);
-//         }
-//       };
-
-//       mediaRecorder.start(1000); // 1-second chunks
-//       setIsRecording(true);
-//       setStatus("ACTIVE");
-//     } catch (err) {
-//       console.error("Mic Error:", err);
-//     }
-//   };
-
-//   const stopRecording = () => {
-//     mediaRecorderRef.current?.stop();
-//     mediaRecorderRef.current?.stream.getTracks().forEach(t => t.stop());
-//     setIsRecording(false);
-//   };
-
-// useEffect(() => {
-//   const SpeechRecognition =
-//     window.SpeechRecognition || window.webkitSpeechRecognition;
-
-//   if (!SpeechRecognition) {
-//     console.error("Speech Recognition not supported");
-//     return;
-//   }
-
-//   let isManuallyStopped = false;
-
-//   const recognition = new SpeechRecognition();
-//   recognition.continuous = true;
-//   recognition.interimResults = true;
-//   recognition.lang = "en-US";
-
-//   recognition.onresult = (event: any) => {
-//     let transcript = "";
-//     for (let i = event.resultIndex; i < event.results.length; i++) {
-//       transcript += event.results[i][0].transcript;
-//     }
-
-//     const text = transcript.toLowerCase().trim();
-//     console.log("🎧 Transcript Update:", text);
-
-//     if (text.includes("essence") && !isRecording) {
-//       startRecording();
-//     }
-
-//     if (text.includes("over") && isRecording) {
-//       stopRecording();
-//       handleCommit();
-//     }
-//   };
-
-//   recognition.onerror = (e: any) => {
-//     if (e.error === "no-speech") return; // ignore silence
-//     console.warn("Speech recognition error:", e.error);
-//   };
-
-//   recognition.onend = () => {
-//     if (!isManuallyStopped) {
-//       setTimeout(() => {
-//         try {
-//           recognition.start();
-//         } catch {}
-//       }, 300);
-//     }
-//   };
-
-//   recognition.start();
-//   recognitionRef.current = recognition;
-
-//   return () => {
-//     isManuallyStopped = true;
-//     recognition.stop();
-//   };
-// }, [isRecording]);
 
 //New Audio Recording code
 
@@ -442,16 +356,6 @@ const stopRecording = () => {
     handleCommit();
   };
 
-  // const toggleMic = () => {
-  //   if (isRecording) {
-  //     stopRecording();
-  //     setStatus("INACTIVE");
-  //   }
-  //   else startRecording();
-  // };
-
-  // Voice Command Logic
-  
 const toggleMic = () => {
   if (isRecording) {
     stopRecording();
@@ -531,12 +435,15 @@ const toggleMic = () => {
         reader.onload = (event) => {
           if (ws && ws.readyState === WebSocket.OPEN && event.target?.result) {
             const imgStr = event.target.result as string;
+            console.log("Paste Image Data:", imgStr.substring(0, 50) + "...", imgStr.length);
             setPendingImage(imgStr); // Update UI preview
             ws.send(JSON.stringify({
               type: "image_input",
               image: imgStr,
               source: "pasted"
             }));
+          } else {
+             console.warn("WS not ready or paste failed");
           }
         };
         if (blob) reader.readAsDataURL(blob);
@@ -752,9 +659,11 @@ const toggleMic = () => {
           <div className="fixed bottom-24 right-4 flex flex-col items-end space-y-2 animate-in fade-in slide-in-from-bottom-2 z-50">
             {pendingImage && (
               <div className="relative group">
+                 {/* {console.log("Rendering pendingImage:", pendingImage.substring(0,20), pendingImage.length)} */}
                 <img
                   src={pendingImage}
                   alt="Pending Context"
+                  onError={(e) => console.error("Image load error", e)}
                   className="w-24 h-auto rounded-lg border-2 border-teal-500/50 shadow-lg object-cover bg-gray-900"
                 />
                 <div className="absolute -top-2 -right-2 bg-teal-500 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full z-10">
