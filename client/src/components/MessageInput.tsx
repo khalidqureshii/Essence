@@ -4,6 +4,7 @@ import { Camera, Mic, Send, Square, Monitor } from "lucide-react";
 
 
 interface MessageInputProps {
+  value?: string; // Controlled component prop
   onSend: () => void;
   onInputChange: (text: string) => void;
   onMicClick: () => void;
@@ -17,6 +18,7 @@ interface MessageInputProps {
 }
 
 const MessageInput: React.FC<MessageInputProps> = ({
+  value,
   onSend,
   onInputChange,
   onMicClick,
@@ -28,7 +30,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   isSharing,
   disabled,
 }) => {
-  const [message, setMessage] = useState<string>("");
+  // const [message, setMessage] = useState<string>(""); // Removed internal state
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
 
   // Ref for cleanup callback
@@ -38,12 +40,12 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const handleSend = () => {
     // Delegate validation to parent (so we can send images with empty text)
     onSend();
-    setMessage("");
-    onInputChange("");
+    // setMessage(""); // Handled by parent
+    // onInputChange(""); // Handled by parent
   };
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMessage(e.target.value);
+    // setMessage(e.target.value);
     onInputChange(e.target.value);
   };
 
@@ -150,7 +152,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
 
         <textarea
           rows={1}
-          value={message}
+          value={value || ""}
           onChange={handleTextChange}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {

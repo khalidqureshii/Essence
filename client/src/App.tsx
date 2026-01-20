@@ -3,6 +3,10 @@ import ChatMessage from "./components/ChatMessage";
 import MessageInput from "./components/MessageInput";
 import { API_BASE_URL } from "./config";
 import { Toaster, toast } from "react-hot-toast";
+import SpeechRecognition, {
+  useSpeechRecognition
+} from "react-speech-recognition";
+
 
 interface Message {
   id: string;
@@ -16,6 +20,8 @@ interface Message {
 declare global {
   interface Window {
     currentUtterance?: SpeechSynthesisUtterance | null;
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
   }
 }
 
@@ -43,10 +49,15 @@ const App: React.FC = () => {
   });
 
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+const isStoppingRef = useRef(false); // NEW
+
+  
   const screenStreamRef = useRef<MediaStream | null>(null);
   // Ref to hold latest handleScreenshot to avoid stale closures in WS effect
   const handleScreenshotRef = useRef<((autoSend?: boolean) => Promise<void>) | null>(null);
+  const pendingCommitRef = useRef(false);
 
   const scrollToBottom = () =>
     chatEndRef.current?.scrollIntoView({ block: "end" }); // Removed smooth behavior for performance
@@ -120,10 +131,36 @@ const App: React.FC = () => {
               break;
 
             case "transcript_update":
-              setMessages(prev => {
-                return [...prev]; // Placeholder for now
-              });
-              console.log("Transcript Update:", data.payload);
+              if (data.payload) {
+                 const lower = data.payload.trim().toLowerCase();
+                 // Filter common Whisper hallucinations on silence
+                 const isHallucination = 
+                   lower === "thank you." || 
+                   lower === "thank you" || 
+                   lower === "you" ||
+                   lower === ".";
+                 
+                 if (!isHallucination) {
+                   console.log("✅ Valid Backend Transcript:", data.payload);
+                   setCurrentDraft(data.payload);
+                   
+                   // Delayed commit: If we were waiting for this text, commit now
+                   if (pendingCommitRef.current) {
+                      console.log("🚀 Triggering delayed commit");
+                      socket?.send(JSON.stringify({ type: "commit" }));
+                      pendingCommitRef.current = false;
+                      setCurrentDraft(""); // Clear after auto-commit
+                   }
+                 } else {
+                   console.warn("⚠️ Filtered Hallucination:", lower);
+                   // If we were waiting but got garbage, abort commit
+                   if (pendingCommitRef.current) {
+                      pendingCommitRef.current = false;
+                      setCurrentDraft("");
+                   }
+                 }
+              }
+              // console.log("Transcript Update:", data.payload); // reduced noise
               break;
 
             case "response_chunk":
@@ -189,31 +226,208 @@ const App: React.FC = () => {
   }, []);
 
   // Audio Recording (Continuous Logic)
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
+//   const recognitionRef = useRef(null);
+//   const startRecording = async () => {
+//     try {
+//       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+//       const mediaRecorder = new MediaRecorder(stream);
+//       mediaRecorderRef.current = mediaRecorder;
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0 && ws && ws.readyState === WebSocket.OPEN && !speakingText) {
-          ws.send(event.data);
-        }
-      };
+//       mediaRecorder.ondataavailable = (event) => {
+//         if (event.data.size > 0 && ws && ws.readyState === WebSocket.OPEN && !speakingText) {
+//           ws.send(event.data);
+//         }
+//       };
 
-      mediaRecorder.start(1000); // 1-second chunks
-      setIsRecording(true);
-      setStatus("ACTIVE");
-    } catch (err) {
-      console.error("Mic Error:", err);
-    }
+//       mediaRecorder.start(1000); // 1-second chunks
+//       setIsRecording(true);
+//       setStatus("ACTIVE");
+//     } catch (err) {
+//       console.error("Mic Error:", err);
+//     }
+//   };
+
+//   const stopRecording = () => {
+//     mediaRecorderRef.current?.stop();
+//     mediaRecorderRef.current?.stream.getTracks().forEach(t => t.stop());
+//     setIsRecording(false);
+//   };
+
+// useEffect(() => {
+//   const SpeechRecognition =
+//     window.SpeechRecognition || window.webkitSpeechRecognition;
+
+//   if (!SpeechRecognition) {
+//     console.error("Speech Recognition not supported");
+//     return;
+//   }
+
+//   let isManuallyStopped = false;
+
+//   const recognition = new SpeechRecognition();
+//   recognition.continuous = true;
+//   recognition.interimResults = true;
+//   recognition.lang = "en-US";
+
+//   recognition.onresult = (event: any) => {
+//     let transcript = "";
+//     for (let i = event.resultIndex; i < event.results.length; i++) {
+//       transcript += event.results[i][0].transcript;
+//     }
+
+//     const text = transcript.toLowerCase().trim();
+//     console.log("🎧 Transcript Update:", text);
+
+//     if (text.includes("essence") && !isRecording) {
+//       startRecording();
+//     }
+
+//     if (text.includes("over") && isRecording) {
+//       stopRecording();
+//       handleCommit();
+//     }
+//   };
+
+//   recognition.onerror = (e: any) => {
+//     if (e.error === "no-speech") return; // ignore silence
+//     console.warn("Speech recognition error:", e.error);
+//   };
+
+//   recognition.onend = () => {
+//     if (!isManuallyStopped) {
+//       setTimeout(() => {
+//         try {
+//           recognition.start();
+//         } catch {}
+//       }, 300);
+//     }
+//   };
+
+//   recognition.start();
+//   recognitionRef.current = recognition;
+
+//   return () => {
+//     isManuallyStopped = true;
+//     recognition.stop();
+//   };
+// }, [isRecording]);
+
+//New Audio Recording code
+
+const {
+  transcript,
+  resetTranscript
+} = useSpeechRecognition();
+
+useEffect(() => {
+  if (!SpeechRecognition.browserSupportsSpeechRecognition()) {
+    console.error("STT not supported");
+    return;
+  }
+
+  SpeechRecognition.startListening({
+    continuous: true,
+    language: "en-US"
+  });
+
+  return () => {
+    SpeechRecognition.stopListening();
   };
+}, []);
 
-  const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
-    mediaRecorderRef.current?.stream.getTracks().forEach(t => t.stop());
-    setIsRecording(false);
-  };
+useEffect(() => {
+  const text = transcript.toLowerCase().trim();
+  if (!text) return;
+
+  console.log("🎧 Transcript Update:", text);
+
+  // START: "hello essence"
+  if (
+    /\bhello essence\b/.test(text) &&
+    !isRecording
+  ) {
+    startRecording();
+    resetTranscript(); // important to avoid repeat trigger
+  }
+
+  // STOP: "over"
+  if (
+    /\bover\b/.test(text) &&
+    isRecording
+  ) {
+    stopRecording();
+    setTimeout(() => {
+    handleCommit();
+    resetTranscript();
+  }, 300); // 🔑 allow audio flush
+  }
+}, [transcript]);
+
+const startRecording = async () => {
+  try {
+    if (isRecording) return;
+    setCurrentDraft("");
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mediaRecorder = new MediaRecorder(stream);
+    mediaRecorderRef.current = mediaRecorder;
+
+    mediaRecorder.ondataavailable = async (event) => {
+      if (event.data.size <= 0) return;
+
+      // Send audio chunk
+      if (ws && ws.readyState === WebSocket.OPEN && !speakingText) {
+        ws.send(event.data);
+        // debug logging
+        event.data.arrayBuffer().then(buf =>
+          console.log("Sent chunk bytes:", buf.byteLength)
+        );
+      } else {
+        console.warn("Cannot send audio chunk: ws not open");
+      }
+
+      // If we are in stopping mode, this was the FINAL chunk.
+      // Trigger commit only AFTER this chunk has been sent.
+      if (isStoppingRef.current) {
+        isStoppingRef.current = false;
+
+        // Optional small delay to give the server socket loop time to append bytes
+        setTimeout(() => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            console.log("🔔 Sending commit to backend after final chunk");
+            ws.send(JSON.stringify({ type: "commit" }));
+          } else {
+            console.warn("Commit aborted: ws not open");
+          }
+        }, 120); // 100–300ms is fine; small to be safe
+      }
+    };
+
+    mediaRecorder.start(1000);
+    setIsRecording(true);
+    setStatus("ACTIVE");
+  } catch (err) {
+    console.error("Mic Error:", err);
+  }
+};
+
+
+const stopRecording = () => {
+  if (!mediaRecorderRef.current) return;
+
+  // Mark that we're stopping — the next ondataavailable will be final
+  isStoppingRef.current = true;
+
+  // Force final dataavailable event
+  mediaRecorderRef.current.requestData();
+
+  // Stop recording (final dataavailable fires before onstop)
+  mediaRecorderRef.current.stop();
+  mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
+
+  setIsRecording(false);
+};
+
+
 
   const cancelRecording = () => {
     stopRecording();
@@ -228,13 +442,30 @@ const App: React.FC = () => {
     handleCommit();
   };
 
-  const toggleMic = () => {
-    if (isRecording) {
-      stopRecording();
-      setStatus("INACTIVE");
-    }
-    else startRecording();
-  };
+  // const toggleMic = () => {
+  //   if (isRecording) {
+  //     stopRecording();
+  //     setStatus("INACTIVE");
+  //   }
+  //   else startRecording();
+  // };
+
+  // Voice Command Logic
+  
+const toggleMic = () => {
+  if (isRecording) {
+    stopRecording();
+    setStatus("INACTIVE");
+  } else {
+    startRecording();
+  }
+};
+
+  const actionsRef = useRef({ isRecording, startRecording, finishRecording });
+  useEffect(() => {
+    actionsRef.current = { isRecording, startRecording, finishRecording };
+  }, [isRecording, startRecording, finishRecording]);
+
 
   // Image Input
   const handleScreenshot = async (autoSend: boolean = false) => {
@@ -418,6 +649,35 @@ const App: React.FC = () => {
   };
 
   const handleCommit = () => {
+    // Also filter hallucinations at commit time just in case
+    const lower = currentDraft.trim().toLowerCase();
+    const isHallucination = 
+        lower === "thank you." || 
+        lower === "thank you" || 
+        lower === "you" ||
+        lower === ".";
+
+    // If hallucination, clear and abort
+    if (isHallucination) {
+      setCurrentDraft("");
+      return;
+    }
+
+    // If empty and no image, WAIT for potential backend transcript (latency)
+    if (!currentDraft.trim() && !pendingImage) {
+      console.log("Empty draft, waiting for transcript...");
+      pendingCommitRef.current = true;
+      // Safety timeout: If no transcript arrives in 3s, abort
+      setTimeout(() => {
+        if (pendingCommitRef.current) {
+           console.log("Commit timeout - no transcript arrived.");
+           pendingCommitRef.current = false;
+        }
+      }, 3000);
+      return;
+    }
+
+    // Normal commit
     if (currentDraft.trim() || pendingImage) {
       setCurrentDraft("");
       setPendingImage(null);
@@ -518,6 +778,7 @@ const App: React.FC = () => {
             if (isRecording) finishRecording();
             else handleCommit();
           }}
+          value={currentDraft} // Controlled input
           onInputChange={(text) => handleSendText(text)}
           onMicClick={toggleMic}
           onCameraClick={handleScreenshot}
