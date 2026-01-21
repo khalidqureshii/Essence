@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
 import ChatMessage from "./components/ChatMessage";
 import MessageInput from "./components/MessageInput";
-import { API_BASE_URL } from "./config";
 import { Toaster, toast } from "react-hot-toast";
 import SpeechRecognition, {
   useSpeechRecognition
 } from "react-speech-recognition";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 interface Message {
   id: string;
