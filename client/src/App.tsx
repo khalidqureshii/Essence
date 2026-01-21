@@ -51,9 +51,9 @@ const App: React.FC = () => {
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-const isStoppingRef = useRef(false); // NEW
+  const isStoppingRef = useRef(false); // NEW
 
-  
+
   const screenStreamRef = useRef<MediaStream | null>(null);
   // Ref to hold latest handleScreenshot to avoid stale closures in WS effect
   const handleScreenshotRef = useRef<((autoSend?: boolean) => Promise<void>) | null>(null);
@@ -63,7 +63,7 @@ const isStoppingRef = useRef(false); // NEW
     chatEndRef.current?.scrollIntoView({ block: "end" }); // Removed smooth behavior for performance
   useEffect(scrollToBottom, [messages]);
 
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  // const [isSpeaking, setIsSpeaking] = useState(false);
 
   // ... (WebSocket useEffect) ...
 
@@ -136,33 +136,33 @@ const isStoppingRef = useRef(false); // NEW
 
             case "transcript_update":
               if (data.payload) {
-                 const lower = data.payload.trim().toLowerCase();
-                 // Filter common Whisper hallucinations on silence
-                 const isHallucination = 
-                   lower === "thank you." || 
-                   lower === "thank you" || 
-                   lower === "you" ||
-                   lower === ".";
-                 
-                 if (!isHallucination) {
-                   console.log("✅ Valid Backend Transcript:", data.payload);
-                   setCurrentDraft(data.payload);
-                   
-                   // Delayed commit: If we were waiting for this text, commit now
-                   if (pendingCommitRef.current) {
-                      console.log("🚀 Triggering delayed commit");
-                      socket?.send(JSON.stringify({ type: "commit" }));
-                      pendingCommitRef.current = false;
-                      setCurrentDraft(""); // Clear after auto-commit
-                   }
-                 } else {
-                   console.warn("⚠️ Filtered Hallucination:", lower);
-                   // If we were waiting but got garbage, abort commit
-                   if (pendingCommitRef.current) {
-                      pendingCommitRef.current = false;
-                      setCurrentDraft("");
-                   }
-                 }
+                const lower = data.payload.trim().toLowerCase();
+                // Filter common Whisper hallucinations on silence
+                const isHallucination =
+                  lower === "thank you." ||
+                  lower === "thank you" ||
+                  lower === "you" ||
+                  lower === ".";
+
+                if (!isHallucination) {
+                  console.log("✅ Valid Backend Transcript:", data.payload);
+                  setCurrentDraft(data.payload);
+
+                  // Delayed commit: If we were waiting for this text, commit now
+                  if (pendingCommitRef.current) {
+                    console.log("🚀 Triggering delayed commit");
+                    socket?.send(JSON.stringify({ type: "commit" }));
+                    pendingCommitRef.current = false;
+                    setCurrentDraft(""); // Clear after auto-commit
+                  }
+                } else {
+                  console.warn("⚠️ Filtered Hallucination:", lower);
+                  // If we were waiting but got garbage, abort commit
+                  if (pendingCommitRef.current) {
+                    pendingCommitRef.current = false;
+                    setCurrentDraft("");
+                  }
+                }
               }
               // console.log("Transcript Update:", data.payload); // reduced noise
               break;
@@ -230,120 +230,120 @@ const isStoppingRef = useRef(false); // NEW
   }, []);
 
 
-//New Audio Recording code
+  //New Audio Recording code
 
-const {
-  transcript,
-  resetTranscript
-} = useSpeechRecognition();
+  const {
+    transcript,
+    resetTranscript
+  } = useSpeechRecognition();
 
-useEffect(() => {
-  if (!SpeechRecognition.browserSupportsSpeechRecognition()) {
-    console.error("STT not supported");
-    return;
-  }
+  useEffect(() => {
+    if (!SpeechRecognition.browserSupportsSpeechRecognition()) {
+      console.error("STT not supported");
+      return;
+    }
 
-  SpeechRecognition.startListening({
-    continuous: true,
-    language: "en-US"
-  });
+    SpeechRecognition.startListening({
+      continuous: true,
+      language: "en-US"
+    });
 
-  return () => {
-    SpeechRecognition.stopListening();
-  };
-}, []);
-
-useEffect(() => {
-  const text = transcript.toLowerCase().trim();
-  if (!text) return;
-
-  console.log("🎧 Transcript Update:", text);
-
-  // START: "hello essence"
-  if (
-    /\bhello essence\b/.test(text) &&
-    !isRecording
-  ) {
-    startRecording();
-    resetTranscript(); // important to avoid repeat trigger
-  }
-
-  // STOP: "over"
-  if (
-    /\bover\b/.test(text) &&
-    isRecording
-  ) {
-    stopRecording();
-    setTimeout(() => {
-    handleCommit();
-    resetTranscript();
-  }, 300); // 🔑 allow audio flush
-  }
-}, [transcript]);
-
-const startRecording = async () => {
-  try {
-    if (isRecording) return;
-    setCurrentDraft("");
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mediaRecorder = new MediaRecorder(stream);
-    mediaRecorderRef.current = mediaRecorder;
-
-    mediaRecorder.ondataavailable = async (event) => {
-      if (event.data.size <= 0) return;
-
-      // Send audio chunk
-      if (ws && ws.readyState === WebSocket.OPEN && !speakingText) {
-        ws.send(event.data);
-        // debug logging
-        event.data.arrayBuffer().then(buf =>
-          console.log("Sent chunk bytes:", buf.byteLength)
-        );
-      } else {
-        console.warn("Cannot send audio chunk: ws not open");
-      }
-
-      // If we are in stopping mode, this was the FINAL chunk.
-      // Trigger commit only AFTER this chunk has been sent.
-      if (isStoppingRef.current) {
-        isStoppingRef.current = false;
-
-        // Optional small delay to give the server socket loop time to append bytes
-        setTimeout(() => {
-          if (ws && ws.readyState === WebSocket.OPEN) {
-            console.log("🔔 Sending commit to backend after final chunk");
-            ws.send(JSON.stringify({ type: "commit" }));
-          } else {
-            console.warn("Commit aborted: ws not open");
-          }
-        }, 120); // 100–300ms is fine; small to be safe
-      }
+    return () => {
+      SpeechRecognition.stopListening();
     };
+  }, []);
 
-    mediaRecorder.start(1000);
-    setIsRecording(true);
-    setStatus("ACTIVE");
-  } catch (err) {
-    console.error("Mic Error:", err);
-  }
-};
+  useEffect(() => {
+    const text = transcript.toLowerCase().trim();
+    if (!text) return;
+
+    console.log("🎧 Transcript Update:", text);
+
+    // START: "hello essence"
+    if (
+      /\bhello essence\b/.test(text) &&
+      !isRecording
+    ) {
+      startRecording();
+      resetTranscript(); // important to avoid repeat trigger
+    }
+
+    // STOP: "over"
+    if (
+      /\bover\b/.test(text) &&
+      isRecording
+    ) {
+      stopRecording();
+      setTimeout(() => {
+        handleCommit();
+        resetTranscript();
+      }, 300); // 🔑 allow audio flush
+    }
+  }, [transcript]);
+
+  const startRecording = async () => {
+    try {
+      if (isRecording) return;
+      setCurrentDraft("");
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = async (event) => {
+        if (event.data.size <= 0) return;
+
+        // Send audio chunk
+        if (ws && ws.readyState === WebSocket.OPEN && !speakingText) {
+          ws.send(event.data);
+          // debug logging
+          event.data.arrayBuffer().then(buf =>
+            console.log("Sent chunk bytes:", buf.byteLength)
+          );
+        } else {
+          console.warn("Cannot send audio chunk: ws not open");
+        }
+
+        // If we are in stopping mode, this was the FINAL chunk.
+        // Trigger commit only AFTER this chunk has been sent.
+        if (isStoppingRef.current) {
+          isStoppingRef.current = false;
+
+          // Optional small delay to give the server socket loop time to append bytes
+          setTimeout(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              console.log("🔔 Sending commit to backend after final chunk");
+              ws.send(JSON.stringify({ type: "commit" }));
+            } else {
+              console.warn("Commit aborted: ws not open");
+            }
+          }, 120); // 100–300ms is fine; small to be safe
+        }
+      };
+
+      mediaRecorder.start(1000);
+      setIsRecording(true);
+      setStatus("ACTIVE");
+    } catch (err) {
+      console.error("Mic Error:", err);
+    }
+  };
 
 
-const stopRecording = () => {
-  if (!mediaRecorderRef.current) return;
+  const stopRecording = () => {
+    if (!mediaRecorderRef.current) return;
 
-  // Mark that we're stopping — the next ondataavailable will be final
-  isStoppingRef.current = true;
+    // Mark that we're stopping — the next ondataavailable will be final
+    isStoppingRef.current = true;
 
-  // Force final dataavailable event
-  mediaRecorderRef.current.requestData();
+    // Force final dataavailable event
+    mediaRecorderRef.current.requestData();
 
-  // Stop recording (final dataavailable fires before onstop)
-  mediaRecorderRef.current.stop();
-  mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
+    // Stop recording (final dataavailable fires before onstop)
+    mediaRecorderRef.current.stop();
+    mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
 
-  setIsRecording(false);
-};
+    setIsRecording(false);
+  };
 
 
 
@@ -360,14 +360,14 @@ const stopRecording = () => {
     handleCommit();
   };
 
-const toggleMic = () => {
-  if (isRecording) {
-    stopRecording();
-    setStatus("INACTIVE");
-  } else {
-    startRecording();
-  }
-};
+  const toggleMic = () => {
+    if (isRecording) {
+      stopRecording();
+      setStatus("INACTIVE");
+    } else {
+      startRecording();
+    }
+  };
 
   const actionsRef = useRef({ isRecording, startRecording, finishRecording });
   useEffect(() => {
@@ -447,7 +447,7 @@ const toggleMic = () => {
               source: "pasted"
             }));
           } else {
-             console.warn("WS not ready or paste failed");
+            console.warn("WS not ready or paste failed");
           }
         };
         if (blob) reader.readAsDataURL(blob);
@@ -562,11 +562,11 @@ const toggleMic = () => {
   const handleCommit = () => {
     // Also filter hallucinations at commit time just in case
     const lower = currentDraft.trim().toLowerCase();
-    const isHallucination = 
-        lower === "thank you." || 
-        lower === "thank you" || 
-        lower === "you" ||
-        lower === ".";
+    const isHallucination =
+      lower === "thank you." ||
+      lower === "thank you" ||
+      lower === "you" ||
+      lower === ".";
 
     // If hallucination, clear and abort
     if (isHallucination) {
@@ -581,8 +581,8 @@ const toggleMic = () => {
       // Safety timeout: If no transcript arrives in 3s, abort
       setTimeout(() => {
         if (pendingCommitRef.current) {
-           console.log("Commit timeout - no transcript arrived.");
-           pendingCommitRef.current = false;
+          console.log("Commit timeout - no transcript arrived.");
+          pendingCommitRef.current = false;
         }
       }, 3000);
       return;
@@ -663,7 +663,7 @@ const toggleMic = () => {
           <div className="fixed bottom-24 right-4 flex flex-col items-end space-y-2 animate-in fade-in slide-in-from-bottom-2 z-50">
             {pendingImage && (
               <div className="relative group">
-                 {/* {console.log("Rendering pendingImage:", pendingImage.substring(0,20), pendingImage.length)} */}
+                {/* {console.log("Rendering pendingImage:", pendingImage.substring(0,20), pendingImage.length)} */}
                 <img
                   src={pendingImage}
                   alt="Pending Context"
