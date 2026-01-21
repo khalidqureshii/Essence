@@ -33,7 +33,7 @@ const App: React.FC = () => {
     {
       id: "init-1",
       sender: "bot",
-      text: "Hi, I am Essence - your Agentic Critic. Say 'HelloEssence' or click Mic to start.",
+      text: "Hi, I am Essence - your Agentic Critic. Say 'Hello Essence' or click Mic to start.",
       isFinal: true,
     },
   ]);
