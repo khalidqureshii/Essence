@@ -67,7 +67,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ sender, text, image, onPlay, 
           <div className="mt-2 flex justify-start">
             <button
               onClick={() => onPlay(text)}
-              className={`text-xs uppercase font-semibold tracking-wider p-1 rounded transition-colors flex items-center gap-1 ${isPlaying
+              className={`listen-button text-xs uppercase font-semibold tracking-wider p-1 rounded transition-colors flex items-center gap-1 ${isPlaying
                   ? "text-red-400 hover:text-red-300 hover:bg-white/5"
                   : "text-gray-400 hover:text-teal-400 hover:bg-white/5"
                 }`}

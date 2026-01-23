@@ -84,6 +84,11 @@ button:focus-visible {
   border: 1px solid #cccccc !important;
 }
 
+/* Hide interactive audio controls in PDF */
+.pdf-export .listen-button {
+  display: none !important;
+}
+
 /* Improve typography and layout for PDFs */
 .pdf-export {
   /* Force A4-friendly width to ensure text doesn't shrink when scaled to PDF */
