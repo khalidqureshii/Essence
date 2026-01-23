@@ -5,6 +5,8 @@ import { Toaster, toast } from "react-hot-toast";
 import SpeechRecognition, {
   useSpeechRecognition
 } from "react-speech-recognition";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -58,6 +60,9 @@ const App: React.FC = () => {
   // Ref to hold latest handleScreenshot to avoid stale closures in WS effect
   const handleScreenshotRef = useRef<((autoSend?: boolean) => Promise<void>) | null>(null);
   const pendingCommitRef = useRef(false);
+  
+  // Robustness: Track the last sent image to ensure it appears in chat even if backend doesn't echo it
+  const lastSentImageRef = useRef<string | null>(null);
 
   const scrollToBottom = () =>
     chatEndRef.current?.scrollIntoView({ block: "end" }); // Removed smooth behavior for performance
@@ -191,13 +196,21 @@ const App: React.FC = () => {
               break;
 
             case "commit_confirmation":
+              // Fallback: If backend sends no image, use the one we just sent (optimistic persistence)
+              // READ REF OUTSIDE UPDATER (Safety fix for Strict Mode / Double Render)
+              const fallbackImage = lastSentImageRef.current;
+              // Clear immediately as it's consumed
+              lastSentImageRef.current = null;
+
               setMessages(prev => {
-                const displayText = data.payload.text || (data.payload.image ? "" : "🎤 (Audio Message)");
+                const imageToUse = data.payload.image || fallbackImage;
+                const displayText = data.payload.text || (imageToUse ? "" : "🎤 (Audio Message)");
+                
                 return [...prev, {
                   id: crypto.randomUUID(),
                   sender: "user",
                   text: displayText,
-                  image: data.payload.image
+                  image: imageToUse
                 }];
               });
               break;
@@ -413,6 +426,8 @@ const App: React.FC = () => {
         }));
 
         if (autoSend) {
+          // Robustness: Even if auto-sending, we need to persist this for the response
+          lastSentImageRef.current = base64Image;
           ws.send(JSON.stringify({ type: "commit" }));
           setPendingImage(null);
         }
@@ -590,12 +605,97 @@ const App: React.FC = () => {
 
     // Normal commit
     if (currentDraft.trim() || pendingImage) {
+      // Save pendingImage to ref before clearing it
+      if (pendingImage) {
+        lastSentImageRef.current = pendingImage;
+      } else {
+        lastSentImageRef.current = null;
+      }
+      
       setCurrentDraft("");
       setPendingImage(null);
     }
 
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "commit" }));
+    }
+  };
+
+  const exportChatToPDF = async () => {
+    const element = document.getElementById("chat-export");
+    if (!element) return;
+
+    element.classList.add("pdf-export");
+
+    const toastId = toast.loading("Generating PDF...");
+
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 2, // good balance between clarity and size
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        ignoreElements: (element) => element.tagName === 'VIDEO' // ignore video elements if any
+      });
+
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      // Canvas dimensions in pixels
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+
+      // Convert canvas pixels -> PDF mm
+      const ratio = pageWidth / canvasWidth;
+      const pageHeightPx = pageHeight / ratio;
+
+      let position = 0;
+      let pageIndex = 0;
+
+      while (position < canvasHeight) {
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = canvasWidth;
+        pageCanvas.height = Math.min(pageHeightPx, canvasHeight - position);
+
+        const ctx = pageCanvas.getContext("2d");
+        if (!ctx) break;
+
+        ctx.drawImage(
+          canvas,
+          0,
+          position,
+          canvasWidth,
+          pageCanvas.height,
+          0,
+          0,
+          canvasWidth,
+          pageCanvas.height
+        );
+
+        const pageImgData = pageCanvas.toDataURL("image/jpeg", 0.85); // JPEG drastically reduces size
+
+        if (pageIndex > 0) pdf.addPage();
+        pdf.addImage(
+          pageImgData,
+          "JPEG",
+          0,
+          0,
+          pageWidth,
+          (pageCanvas.height * pageWidth) / canvasWidth
+        );
+
+        position += pageHeightPx;
+        pageIndex++;
+      }
+
+      pdf.save(`essence-session-${Date.now()}.pdf`);
+      toast.success("PDF Downloaded!", { id: toastId });
+    } catch (error) {
+      console.error("PDF Export Error:", error);
+      toast.error("Failed to export PDF", { id: toastId });
+    } finally {
+      element.classList.remove("pdf-export");
     }
   };
 
@@ -639,13 +739,19 @@ const App: React.FC = () => {
                 </span>
               </label>
               <span className="text-xs text-gray-500 mr-2 uppercase tracking-wide">Ready</span>
+              <button
+                onClick={exportChatToPDF}
+                className="text-xs px-3 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white transition-colors"
+              >
+                Download PDF
+              </button>
             </div>
           )}
         </div>
       </header>
 
       {/* Chat Area (scrollable only here) */}
-      <main className="flex-1 overflow-y-auto px-4 md:px-16 py-6 space-y-4 scrollbar-hide relative">
+      <main id="chat-export" className="flex-1 overflow-y-auto px-4 md:px-16 py-6 space-y-4 scrollbar-hide relative">
         {messages.map((msg, i) => (
           <ChatMessage
             key={i}

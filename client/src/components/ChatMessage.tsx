@@ -15,7 +15,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ sender, text, image, onPlay, 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4 animate-in fade-in slide-in-from-bottom-2`}>
       <div
-        className={`max-w-[80%] rounded-2xl px-5 py-3 shadow-sm ${isUser
+        className={`message-bubble ${isUser ? "user-message" : "bot-message"} max-w-[80%] rounded-2xl px-5 py-3 shadow-sm ${isUser
           ? "bg-teal-600 text-white rounded-br-none"
           : "bg-gray-800 text-gray-100 rounded-bl-none border border-gray-700"
           }`}
