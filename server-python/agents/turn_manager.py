@@ -168,30 +168,49 @@ class TurnManager:
             # Preferred fix: Auto-start turn on speech since mic is explicit
             self.start_turn()
 
-        # 2. Screenshot keywords
-        screenshot_triggers = ["screenshot", "capture", "do you see this", "look at this"]
-        if not self.triggered_commands["screenshot"]:
-            if any(trigger in lower_text for trigger in screenshot_triggers):
-                 self.start_turn() # Ensure active if command given
-                 self.triggered_commands["screenshot"] = True
-                 yield {"type": "command", "payload": "capture_screenshot"}
+        # 2. Screenshot keywords (DISABLED as per user request - only manual click allowed)
+        # screenshot_triggers = [
+        #     "screenshot", "capture", "do you see this", "look at this", 
+        #     "take a screenshot", "take screenshot", "capture screen"
+        # ]
+        # if not self.triggered_commands["screenshot"]:
+        #     if any(trigger in lower_text for trigger in screenshot_triggers):
+        #          self.start_turn() # Ensure active if command given
+        #          self.triggered_commands["screenshot"] = True
+        #          yield {"type": "command", "payload": "capture_screenshot"}
         
         # 3. Commit keywords (Only if active or explicitly typed?)
         commit_triggers = ["over", "your turn"]
         should_commit = any(trigger in lower_text for trigger in commit_triggers)
 
         # 4. Context Update
+        # Clean the text if it contains commit triggers to avoid trailing "over" etc.
+        cleaned_text = text
+        if should_commit:
+            for trigger in commit_triggers:
+                if trigger in lower_text:
+                    # Find the case-insensitive index to preserve original case if possible, 
+                    # but usually, we just want to remove the trigger word.
+                    # A robust way is to use regex or find/replace on the lower version 
+                    # but apply to original.
+                    start_idx = lower_text.find(trigger)
+                    if start_idx != -1:
+                        cleaned_text = text[:start_idx].strip()
+                        # Remove trailing punctuation often added by STT
+                        cleaned_text = cleaned_text.rstrip(".,?!")
+                        break
+
         if source == "text":
             self.start_turn() # Typed text always starts/is part of turn
             if mode == "replace":
-                self.context.typed_text = text
+                self.context.typed_text = cleaned_text
             else:
-                self.context.typed_text += text + " "
+                self.context.typed_text += cleaned_text + " "
             self.context.sources["text"] = True
             
         elif source == "audio":
              if self.context.active:
-                self.context.transcript = text
+                self.context.transcript = cleaned_text
                 self.context.sources["audio"] = True
                 yield {"type": "transcript_update", "payload": self.context.transcript}
 
