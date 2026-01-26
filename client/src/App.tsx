@@ -43,7 +43,8 @@ const App: React.FC = () => {
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [currentDraft, setCurrentDraft] = useState("");
-  const [pendingImage, setPendingImage] = useState<string | null>(null);
+  // const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [pendingImage, setPendingImage] = useState<string[]>([]);
   const [isSharing, setIsSharing] = useState(false);
   const [speakingText, setSpeakingText] = useState<string | null>(null);
   const [autoplayResponses, setAutoplayResponses] = useState(() => {
@@ -62,7 +63,9 @@ const App: React.FC = () => {
   const pendingCommitRef = useRef(false);
   
   // Robustness: Track the last sent image to ensure it appears in chat even if backend doesn't echo it
-  const lastSentImageRef = useRef<string | null>(null);
+  // const lastSentImageRef = useRef<string | null>(null);
+  const lastSentImageRef = useRef<string[]>([]);
+
 
   const scrollToBottom = () =>
     chatEndRef.current?.scrollIntoView({ block: "end" }); // Removed smooth behavior for performance
@@ -200,7 +203,9 @@ const App: React.FC = () => {
               // READ REF OUTSIDE UPDATER (Safety fix for Strict Mode / Double Render)
               const fallbackImage = lastSentImageRef.current;
               // Clear immediately as it's consumed
-              lastSentImageRef.current = null;
+              // lastSentImageRef.current = null;
+              lastSentImageRef.current = [];
+
 
               setMessages(prev => {
                 const imageToUse = data.payload.image || fallbackImage;
@@ -325,7 +330,21 @@ const App: React.FC = () => {
           setTimeout(() => {
             if (ws && ws.readyState === WebSocket.OPEN) {
               console.log("🔔 Sending commit to backend after final chunk");
+              // 1️⃣ Send queued screenshots FIRST
+              pendingImage.forEach(img => {
+                ws.send(JSON.stringify({
+                  type: "image_input",
+                  image: img,
+                  source: "shared"
+                }));
+              });
+
+              // Clear queue
+              setPendingImage([]);
+
+              // 2️⃣ Then commit audio
               ws.send(JSON.stringify({ type: "commit" }));
+
             } else {
               console.warn("Commit aborted: ws not open");
             }
@@ -364,7 +383,8 @@ const App: React.FC = () => {
     stopRecording();
     if (ws) ws.send(JSON.stringify({ type: "reset" }));
     setStatus("INACTIVE");
-    setPendingImage(null); // Clear image on cancel too
+    // setPendingImage(null); // Clear image on cancel too
+    setPendingImage([]);
     setCurrentDraft("");
   };
 
@@ -389,56 +409,109 @@ const App: React.FC = () => {
 
 
   // Image Input
+  // const handleScreenshot = async (autoSend: boolean = false) => {
+  //   try {
+  //     let stream = screenStreamRef.current;
+  //     let isOneOff = false;
+
+  //     // Use active stream if available, otherwise one-off capture
+  //     if (!stream || !stream.active) {
+  //       stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+  //       isOneOff = true;
+  //     }
+
+  //     const video = document.createElement("video");
+  //     video.srcObject = stream;
+  //     await video.play();
+
+  //     const canvas = document.createElement("canvas");
+  //     canvas.width = video.videoWidth;
+  //     canvas.height = video.videoHeight;
+  //     canvas.getContext("2d")?.drawImage(video, 0, 0);
+
+  //     const base64Image = canvas.toDataURL("image/jpeg");
+
+  //     // Only stop one-off streams
+  //     if (isOneOff) {
+  //       stream.getTracks().forEach(track => track.stop());
+  //     }
+
+  //     setPendingImage(base64Image); // Update UI preview
+
+  //     if (ws && ws.readyState === WebSocket.OPEN) {
+  //       ws.send(JSON.stringify({
+  //         type: "image_input",
+  //         image: base64Image,
+  //         source: "shared"
+  //       }));
+
+  //       if (autoSend) {
+  //         // Robustness: Even if auto-sending, we need to persist this for the response
+  //         lastSentImageRef.current = base64Image;
+  //         ws.send(JSON.stringify({ type: "commit" }));
+  //         setPendingImage(null);
+  //       }
+  //     } else {
+  //       console.warn("WebSocket not ready for screenshot");
+  //     }
+
+  //   } catch (e) {
+  //     console.error("Screenshot error:", e);
+  //   }
+  // };
   const handleScreenshot = async (autoSend: boolean = false) => {
-    try {
-      let stream = screenStreamRef.current;
-      let isOneOff = false;
+  try {
+    let stream = screenStreamRef.current;
+    let isOneOff = false;
 
-      // Use active stream if available, otherwise one-off capture
-      if (!stream || !stream.active) {
-        stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        isOneOff = true;
-      }
-
-      const video = document.createElement("video");
-      video.srcObject = stream;
-      await video.play();
-
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext("2d")?.drawImage(video, 0, 0);
-
-      const base64Image = canvas.toDataURL("image/jpeg");
-
-      // Only stop one-off streams
-      if (isOneOff) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-
-      setPendingImage(base64Image); // Update UI preview
-
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          type: "image_input",
-          image: base64Image,
-          source: "shared"
-        }));
-
-        if (autoSend) {
-          // Robustness: Even if auto-sending, we need to persist this for the response
-          lastSentImageRef.current = base64Image;
-          ws.send(JSON.stringify({ type: "commit" }));
-          setPendingImage(null);
-        }
-      } else {
-        console.warn("WebSocket not ready for screenshot");
-      }
-
-    } catch (e) {
-      console.error("Screenshot error:", e);
+    if (!stream || !stream.active) {
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      isOneOff = true;
     }
-  };
+
+    const video = document.createElement("video");
+    video.srcObject = stream;
+    await video.play();
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d")?.drawImage(video, 0, 0);
+
+    const base64Image = canvas.toDataURL("image/jpeg");
+
+    if (isOneOff) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+
+    // 🔒 RECORDING OWNS THE TURN
+    if (isRecording) {
+      // Queue screenshot, DO NOT SEND
+      setPendingImage(prev => [...prev, base64Image]);
+      console.log("📸 Screenshot queued (recording active)");
+      return;
+    }
+
+    // Normal (not recording) behavior
+    setPendingImage([base64Image]);
+
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: "image_input",
+        image: base64Image,
+        source: "shared"
+      }));
+
+      if (autoSend) {
+        ws.send(JSON.stringify({ type: "commit" }));
+        setPendingImage([]);
+      }
+    }
+  } catch (e) {
+    console.error("Screenshot error:", e);
+  }
+};
+
 
   // Keep ref updated for WS usage
   useEffect(() => {
@@ -455,7 +528,7 @@ const App: React.FC = () => {
           if (ws && ws.readyState === WebSocket.OPEN && event.target?.result) {
             const imgStr = event.target.result as string;
             console.log("Paste Image Data:", imgStr.substring(0, 50) + "...", imgStr.length);
-            setPendingImage(imgStr); // Update UI preview
+            setPendingImage(prev => [...prev, imgStr]); // Update UI preview
             ws.send(JSON.stringify({
               type: "image_input",
               image: imgStr,
@@ -590,7 +663,7 @@ const App: React.FC = () => {
     }
 
     // If empty and no image, WAIT for potential backend transcript (latency)
-    if (!currentDraft.trim() && !pendingImage) {
+    if (!currentDraft.trim() && pendingImage.length === 0) {
       console.log("Empty draft, waiting for transcript...");
       pendingCommitRef.current = true;
       // Safety timeout: If no transcript arrives in 3s, abort
@@ -609,11 +682,12 @@ const App: React.FC = () => {
       if (pendingImage) {
         lastSentImageRef.current = pendingImage;
       } else {
-        lastSentImageRef.current = null;
+        lastSentImageRef.current = [];
+
       }
       
       setCurrentDraft("");
-      setPendingImage(null);
+      setPendingImage([]);
     }
 
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -767,18 +841,21 @@ const App: React.FC = () => {
         {/* Context Preview Indicator - Always show if image pending or active */}
         {(status === "ACTIVE" || status === "RESPONDING" || pendingImage) && (
           <div className="fixed bottom-24 right-4 flex flex-col items-end space-y-2 animate-in fade-in slide-in-from-bottom-2 z-50">
-            {pendingImage && (
-              <div className="relative group">
-                {/* {console.log("Rendering pendingImage:", pendingImage.substring(0,20), pendingImage.length)} */}
-                <img
-                  src={pendingImage}
-                  alt="Pending Context"
-                  onError={(e) => console.error("Image load error", e)}
-                  className="w-24 h-auto rounded-lg border-2 border-teal-500/50 shadow-lg object-cover bg-gray-900"
-                />
-                <div className="absolute -top-2 -right-2 bg-teal-500 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full z-10">
-                  IMG
-                </div>
+            {pendingImage.length > 0 && (
+              <div className="flex gap-2">
+                {pendingImage.map((img, idx) => (
+                  <div key={idx} className="relative group">
+                    <img
+                      src={img}
+                      alt={`Pending Context ${idx + 1}`}
+                      onError={(e) => console.error("Image load error", e)}
+                      className="w-24 h-auto rounded-lg border-2 border-teal-500/50 shadow-lg object-cover bg-gray-900"
+                    />
+                    <div className="absolute -top-2 -right-2 bg-teal-500 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full z-10">
+                      IMG
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
             {status === "ACTIVE" && !pendingImage && (
