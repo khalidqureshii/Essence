@@ -15,6 +15,7 @@ interface Message {
   sender: "user" | "bot";
   text: string;
   image?: string;
+  images?: string[];
   isFinal?: boolean;
 }
 
@@ -61,6 +62,17 @@ const App: React.FC = () => {
   // Ref to hold latest handleScreenshot to avoid stale closures in WS effect
   const handleScreenshotRef = useRef<((autoSend?: boolean) => Promise<void>) | null>(null);
   const pendingCommitRef = useRef(false);
+  const pendingImageRef = useRef<string[]>([]);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  // Sync state to ref for stale closures (MediaRecorder)
+  useEffect(() => {
+    pendingImageRef.current = pendingImage;
+  }, [pendingImage]);
+
+  useEffect(() => {
+    wsRef.current = ws;
+  }, [ws]);
   
   // Robustness: Track the last sent image to ensure it appears in chat even if backend doesn't echo it
   // const lastSentImageRef = useRef<string | null>(null);
@@ -159,7 +171,7 @@ const App: React.FC = () => {
                   // Delayed commit: If we were waiting for this text, commit now
                   if (pendingCommitRef.current) {
                     console.log("🚀 Triggering delayed commit");
-                    socket?.send(JSON.stringify({ type: "commit" }));
+                    wsRef.current?.send(JSON.stringify({ type: "commit" }));
                     pendingCommitRef.current = false;
                     setCurrentDraft(""); // Clear after auto-commit
                   }
@@ -201,21 +213,31 @@ const App: React.FC = () => {
             case "commit_confirmation":
               // Fallback: If backend sends no image, use the one we just sent (optimistic persistence)
               // READ REF OUTSIDE UPDATER (Safety fix for Strict Mode / Double Render)
-              const fallbackImage = lastSentImageRef.current;
+              const fallbackImages = lastSentImageRef.current;
               // Clear immediately as it's consumed
-              // lastSentImageRef.current = null;
-              lastSentImageRef.current = [];
-
+              // lastSentImageRef.current = []; // cleared in handleCommit already but safe to ensure
 
               setMessages(prev => {
-                const imageToUse = data.payload.image || fallbackImage;
-                const displayText = data.payload.text || (imageToUse ? "" : "🎤 (Audio Message)");
+                // Support both single 'image' and multiple 'images' from payload
+                let imagesToUse: string[] = [];
+                
+                if (data.payload.images && Array.isArray(data.payload.images) && data.payload.images.length > 0) {
+                  imagesToUse = data.payload.images;
+                } else if (data.payload.image) {
+                   imagesToUse = [data.payload.image];
+                } else {
+                   // If no images from backend, use fallback (local)
+                   imagesToUse = fallbackImages;
+                }
+
+                const hasImages = imagesToUse.length > 0;
+                const displayText = data.payload.text || (hasImages ? "" : "🎤 (Audio Message)");
                 
                 return [...prev, {
                   id: crypto.randomUUID(),
                   sender: "user",
                   text: displayText,
-                  image: imageToUse
+                  images: imagesToUse
                 }];
               });
               break;
@@ -311,8 +333,9 @@ const App: React.FC = () => {
         if (event.data.size <= 0) return;
 
         // Send audio chunk
-        if (ws && ws.readyState === WebSocket.OPEN && !speakingText) {
-          ws.send(event.data);
+        const socket = wsRef.current;
+        if (socket && socket.readyState === WebSocket.OPEN && !speakingText) {
+          socket.send(event.data);
           // debug logging
           event.data.arrayBuffer().then(buf =>
             console.log("Sent chunk bytes:", buf.byteLength)
@@ -327,23 +350,15 @@ const App: React.FC = () => {
           isStoppingRef.current = false;
 
           // Optional small delay to give the server socket loop time to append bytes
-          setTimeout(() => {
-            if (ws && ws.readyState === WebSocket.OPEN) {
+            setTimeout(() => {
+            const currentSocket = wsRef.current;
+            if (currentSocket && currentSocket.readyState === WebSocket.OPEN) {
               console.log("🔔 Sending commit to backend after final chunk");
               // 1️⃣ Send queued screenshots FIRST
-              pendingImage.forEach(img => {
-                ws.send(JSON.stringify({
-                  type: "image_input",
-                  image: img,
-                  source: "shared"
-                }));
-              });
-
-              // Clear queue
-              setPendingImage([]);
+              flushPendingImages();
 
               // 2️⃣ Then commit audio
-              ws.send(JSON.stringify({ type: "commit" }));
+              currentSocket.send(JSON.stringify({ type: "commit" }));
 
             } else {
               console.warn("Commit aborted: ws not open");
@@ -381,7 +396,7 @@ const App: React.FC = () => {
 
   const cancelRecording = () => {
     stopRecording();
-    if (ws) ws.send(JSON.stringify({ type: "reset" }));
+    if (wsRef.current) wsRef.current.send(JSON.stringify({ type: "reset" }));
     setStatus("INACTIVE");
     // setPendingImage(null); // Clear image on cancel too
     setPendingImage([]);
@@ -495,15 +510,15 @@ const App: React.FC = () => {
     // Normal (not recording) behavior
     setPendingImage([base64Image]);
 
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
         type: "image_input",
         image: base64Image,
         source: "shared"
       }));
 
       if (autoSend) {
-        ws.send(JSON.stringify({ type: "commit" }));
+        wsRef.current.send(JSON.stringify({ type: "commit" }));
         setPendingImage([]);
       }
     }
@@ -525,11 +540,11 @@ const App: React.FC = () => {
         const blob = items[i].getAsFile();
         const reader = new FileReader();
         reader.onload = (event) => {
-          if (ws && ws.readyState === WebSocket.OPEN && event.target?.result) {
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && event.target?.result) {
             const imgStr = event.target.result as string;
             console.log("Paste Image Data:", imgStr.substring(0, 50) + "...", imgStr.length);
             setPendingImage(prev => [...prev, imgStr]); // Update UI preview
-            ws.send(JSON.stringify({
+            wsRef.current.send(JSON.stringify({
               type: "image_input",
               image: imgStr,
               source: "pasted"
@@ -544,11 +559,31 @@ const App: React.FC = () => {
   };
 
 
+  const flushPendingImages = () => {
+    const imagesToFlush = pendingImageRef.current;
+    const socket = wsRef.current;
+    if (imagesToFlush.length > 0 && socket && socket.readyState === WebSocket.OPEN) {
+      console.log("🔔 Flushing pending images before commit", imagesToFlush.length);
+      imagesToFlush.forEach(img => {
+        socket.send(JSON.stringify({
+          type: "image_input",
+          image: img,
+          source: "shared"
+        }));
+      });
+      // Update ref for fallback rendering
+      lastSentImageRef.current = imagesToFlush;
+      // Clear queue
+      setPendingImage([]);
+      pendingImageRef.current = [];
+    }
+  };
+
   // Output Handlers
   const handleSendText = (text: string) => {
     setCurrentDraft(text);
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "text_input", text, mode: "replace" }));
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "text_input", text, mode: "replace" }));
     }
   };
 
@@ -677,21 +712,16 @@ const App: React.FC = () => {
     }
 
     // Normal commit
-    if (currentDraft.trim() || pendingImage) {
-      // Save pendingImage to ref before clearing it
-      if (pendingImage) {
-        lastSentImageRef.current = pendingImage;
-      } else {
-        lastSentImageRef.current = [];
-
-      }
+    if (currentDraft.trim() || pendingImage.length > 0) {
+      // 1. Flush Images
+      flushPendingImages();
       
+      // 2. Clear Draft
       setCurrentDraft("");
-      setPendingImage([]);
     }
 
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "commit" }));
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "commit" }));
     }
   };
 
@@ -832,6 +862,7 @@ const App: React.FC = () => {
             sender={msg.sender}
             text={msg.text}
             image={msg.image}
+            images={msg.images}
             isPlaying={speakingText === msg.text}
             onPlay={handleManualMicClick}
           />

@@ -5,11 +5,12 @@ interface ChatMessageProps {
   sender: "user" | "bot";
   text: string;
   image?: string;
+  images?: string[];
   onPlay?: (text: string) => void;
   isPlaying?: boolean;
 }
 
-const ChatMessage: React.FC<ChatMessageProps> = ({ sender, text, image, onPlay, isPlaying }) => {
+const ChatMessage: React.FC<ChatMessageProps> = ({ sender, text, image, images, onPlay, isPlaying }) => {
   const isUser = sender === "user";
 
   return (
@@ -20,12 +21,27 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ sender, text, image, onPlay, 
           : "bg-gray-800 text-gray-100 rounded-bl-none border border-gray-700"
           }`}
       >
-        {image && (
+        {/* Single Image Support (Legacy/Simple) */}
+        {image && !images && (
           <img
             src={image}
             alt="Context"
             className="mb-3 rounded-lg max-h-60 w-auto object-cover border border-white/10"
           />
+        )}
+
+        {/* Multiple Images Support */}
+        {images && images.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {images.map((img, idx) => (
+              <img
+                key={idx}
+                src={img}
+                alt={`Context ${idx + 1}`}
+                className="rounded-lg max-h-40 w-auto object-cover border border-white/10"
+              />
+            ))}
+          </div>
         )}
 
         <div className="prose prose-invert prose-sm max-w-none leading-relaxed">
