@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import ChatMessage from "./components/ChatMessage";
 import MessageInput from "./components/MessageInput";
+import Loader from "./components/Loader";
 import { Toaster, toast } from "react-hot-toast";
 import SpeechRecognition, {
   useSpeechRecognition
@@ -51,6 +52,34 @@ const App: React.FC = () => {
   const [autoplayResponses, setAutoplayResponses] = useState(() => {
     return localStorage.getItem("autoplayResponses") === "true";
   });
+  const [isBackendConnected, setIsBackendConnected] = useState(false);
+
+  useEffect(() => {
+    const checkBackend = async () => {
+      try {
+        const res = await fetch(API_BASE_URL); // Ping backend
+        if (res.ok) {
+          setIsBackendConnected(true);
+          toast.success("Backend Connected!");
+        } else {
+          setTimeout(checkBackend, 2000); // Retry on non-200
+        }
+      } catch (error) {
+        console.log("Backend offline, retrying...", error);
+        setTimeout(checkBackend, 2000); // Retry on error
+      }
+    };
+    
+    checkBackend();
+  }, []);
+
+  if (!isBackendConnected) {
+    return (
+      <div className="h-screen w-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white overflow-hidden justify-center items-center">
+        <Loader />
+      </div>
+    );
+  }
 
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
