@@ -346,7 +346,7 @@ const App: React.FC = () => {
       setTimeout(() => {
         handleCommit();
         resetTranscript();
-      }, 300); // 🔑 allow audio flush
+      }, 1200); // 🔑 allow audio flush
     }
   }, [transcript]);
 
