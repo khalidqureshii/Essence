@@ -37,7 +37,7 @@ const App: React.FC = () => {
     {
       id: "init-1",
       sender: "bot",
-      text: "Hi, I am Essence - your Agentic Critic. Say 'Hello Essence' or click Mic to start.",
+      text: "Hi, I am Essence - your Agentic Critic. Say 'Essence' or click Mic to start.",
       isFinal: true,
     },
   ]);
@@ -328,9 +328,9 @@ const App: React.FC = () => {
 
     console.log("🎧 Transcript Update:", text);
 
-    // START: "hello essence"
+    // START: "essence"
     if (
-      /\bhello essence\b/.test(text) &&
+      /\bessence\b/.test(text) &&
       !isRecording
     ) {
       startRecording();
