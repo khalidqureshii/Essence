@@ -73,13 +73,7 @@ const App: React.FC = () => {
     checkBackend();
   }, []);
 
-  if (!isBackendConnected) {
-    return (
-      <div className="h-screen w-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white overflow-hidden justify-center items-center">
-        <Loader />
-      </div>
-    );
-  }
+
 
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -831,6 +825,14 @@ const App: React.FC = () => {
       element.classList.remove("pdf-export");
     }
   };
+
+  if (!isBackendConnected) {
+    return (
+      <div className="h-screen w-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white overflow-hidden justify-center items-center">
+        <Loader />
+      </div>
+    );
+  }
 
   return (
     <div
