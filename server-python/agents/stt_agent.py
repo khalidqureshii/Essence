@@ -15,6 +15,7 @@ class STTAgent:
                 transcription = self.client.audio.transcriptions.create(
                     file=(os.path.basename(audio_path), file.read()),
                     model=Config.WHISPER_MODEL,
+                    language=Config.TRANSCRIPTION_LANGUAGE,
                     response_format="verbose_json",
                 )
                 return transcription.text
@@ -44,6 +45,7 @@ class STTAgent:
                     transcription = self.client.audio.transcriptions.create(
                         file=("audio.webm", file),
                         model=Config.WHISPER_MODEL,
+                        language=Config.TRANSCRIPTION_LANGUAGE,
                         response_format="verbose_json",
                     )
                 return transcription.text

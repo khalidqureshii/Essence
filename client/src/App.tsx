@@ -7,6 +7,7 @@ import SpeechRecognition, {
 } from "react-speech-recognition";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import ProjectReport from "./Pages/ProjectReport";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -41,6 +42,7 @@ const App: React.FC = () => {
     },
   ]);
   const [status, setStatus] = useState<"INACTIVE" | "ACTIVE" | "RESPONDING">("INACTIVE");
+  const [view, setView] = useState<"chat" | "report">("chat");
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [currentDraft, setCurrentDraft] = useState("");
@@ -73,7 +75,7 @@ const App: React.FC = () => {
   useEffect(() => {
     wsRef.current = ws;
   }, [ws]);
-  
+
   // Robustness: Track the last sent image to ensure it appears in chat even if backend doesn't echo it
   // const lastSentImageRef = useRef<string | null>(null);
   const lastSentImageRef = useRef<string[]>([]);
@@ -215,24 +217,24 @@ const App: React.FC = () => {
               // READ REF OUTSIDE UPDATER (Safety fix for Strict Mode / Double Render)
               const fallbackImages = lastSentImageRef.current;
               // Clear immediately as it's consumed
-              // lastSentImageRef.current = []; // cleared in handleCommit already but safe to ensure
+              lastSentImageRef.current = []; // cleared in handleCommit already but safe to ensure
 
               setMessages(prev => {
                 // Support both single 'image' and multiple 'images' from payload
                 let imagesToUse: string[] = [];
-                
+
                 if (data.payload.images && Array.isArray(data.payload.images) && data.payload.images.length > 0) {
                   imagesToUse = data.payload.images;
                 } else if (data.payload.image) {
-                   imagesToUse = [data.payload.image];
+                  imagesToUse = [data.payload.image];
                 } else {
-                   // If no images from backend, use fallback (local)
-                   imagesToUse = fallbackImages;
+                  // If no images from backend, use fallback (local)
+                  imagesToUse = fallbackImages;
                 }
 
                 const hasImages = imagesToUse.length > 0;
                 const displayText = data.payload.text || (hasImages ? "" : "🎤 (Audio Message)");
-                
+
                 return [...prev, {
                   id: crypto.randomUUID(),
                   sender: "user",
@@ -350,7 +352,7 @@ const App: React.FC = () => {
           isStoppingRef.current = false;
 
           // Optional small delay to give the server socket loop time to append bytes
-            setTimeout(() => {
+          setTimeout(() => {
             const currentSocket = wsRef.current;
             if (currentSocket && currentSocket.readyState === WebSocket.OPEN) {
               console.log("🔔 Sending commit to backend after final chunk");
@@ -475,57 +477,57 @@ const App: React.FC = () => {
   //   }
   // };
   const handleScreenshot = async (autoSend: boolean = false) => {
-  try {
-    let stream = screenStreamRef.current;
-    let isOneOff = false;
+    try {
+      let stream = screenStreamRef.current;
+      let isOneOff = false;
 
-    if (!stream || !stream.active) {
-      stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-      isOneOff = true;
-    }
-
-    const video = document.createElement("video");
-    video.srcObject = stream;
-    await video.play();
-
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d")?.drawImage(video, 0, 0);
-
-    const base64Image = canvas.toDataURL("image/jpeg");
-
-    if (isOneOff) {
-      stream.getTracks().forEach(track => track.stop());
-    }
-
-    // 🔒 RECORDING OWNS THE TURN
-    if (isRecording) {
-      // Queue screenshot, DO NOT SEND
-      setPendingImage(prev => [...prev, base64Image]);
-      console.log("📸 Screenshot queued (recording active)");
-      return;
-    }
-
-    // Normal (not recording) behavior
-    setPendingImage([base64Image]);
-
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: "image_input",
-        image: base64Image,
-        source: "shared"
-      }));
-
-      if (autoSend) {
-        wsRef.current.send(JSON.stringify({ type: "commit" }));
-        setPendingImage([]);
+      if (!stream || !stream.active) {
+        stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        isOneOff = true;
       }
+
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      await video.play();
+
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d")?.drawImage(video, 0, 0);
+
+      const base64Image = canvas.toDataURL("image/jpeg");
+
+      if (isOneOff) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+
+      // 🔒 RECORDING OWNS THE TURN
+      if (isRecording) {
+        // Queue screenshot, DO NOT SEND
+        setPendingImage(prev => [...prev, base64Image]);
+        console.log("📸 Screenshot queued (recording active)");
+        return;
+      }
+
+      // Normal (not recording) behavior
+      setPendingImage([base64Image]);
+
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: "image_input",
+          image: base64Image,
+          source: "shared"
+        }));
+
+        if (autoSend) {
+          wsRef.current.send(JSON.stringify({ type: "commit" }));
+          setPendingImage([]);
+        }
+      }
+    } catch (e) {
+      console.error("Screenshot error:", e);
     }
-  } catch (e) {
-    console.error("Screenshot error:", e);
-  }
-};
+  };
 
 
   // Keep ref updated for WS usage
@@ -715,7 +717,7 @@ const App: React.FC = () => {
     if (currentDraft.trim() || pendingImage.length > 0) {
       // 1. Flush Images
       flushPendingImages();
-      
+
       // 2. Clear Draft
       setCurrentDraft("");
     }
@@ -803,6 +805,10 @@ const App: React.FC = () => {
     }
   };
 
+  if (view === "report") {
+    return <ProjectReport />;
+  }
+
   return (
     <div
       className="h-screen w-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white overflow-hidden"
@@ -843,6 +849,12 @@ const App: React.FC = () => {
                 </span>
               </label>
               <span className="text-xs text-gray-500 mr-2 uppercase tracking-wide">Ready</span>
+              <button
+                onClick={() => setView("report")}
+                className="text-xs px-3 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white transition-colors"
+              >
+                Generate Report
+              </button>
               <button
                 onClick={exportChatToPDF}
                 className="text-xs px-3 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white transition-colors"

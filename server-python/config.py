@@ -13,5 +13,6 @@ class Config:
     
     # Audio whisper
     WHISPER_MODEL = "whisper-large-v3"
+    TRANSCRIPTION_LANGUAGE = "en"
 
     DEBUG = True
