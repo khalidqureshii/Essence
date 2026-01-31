@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import ChatMessage from "./components/ChatMessage";
 import MessageInput from "./components/MessageInput";
+import Loader from "./components/Loader";
 import { Toaster, toast } from "react-hot-toast";
 import SpeechRecognition, {
   useSpeechRecognition
@@ -37,7 +38,7 @@ const App: React.FC = () => {
     {
       id: "init-1",
       sender: "bot",
-      text: "Hi, I am Essence - your Agentic Critic. Say 'Hello Essence' or click Mic to start.",
+      text: "Hi, I am Essence - your Agentic Critic. Say 'Essence' or click Mic to start.",
       isFinal: true,
     },
   ]);
@@ -53,6 +54,28 @@ const App: React.FC = () => {
   const [autoplayResponses, setAutoplayResponses] = useState(() => {
     return localStorage.getItem("autoplayResponses") === "true";
   });
+  const [isBackendConnected, setIsBackendConnected] = useState(false);
+
+  useEffect(() => {
+    const checkBackend = async () => {
+      try {
+        const res = await fetch(API_BASE_URL); // Ping backend
+        if (res.ok) {
+          setIsBackendConnected(true);
+          toast.success("Backend Connected!");
+        } else {
+          setTimeout(checkBackend, 2000); // Retry on non-200
+        }
+      } catch (error) {
+        console.log("Backend offline, retrying...", error);
+        setTimeout(checkBackend, 2000); // Retry on error
+      }
+    };
+
+    checkBackend();
+  }, []);
+
+
 
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -301,9 +324,9 @@ const App: React.FC = () => {
 
     console.log("🎧 Transcript Update:", text);
 
-    // START: "hello essence"
+    // START: "essence"
     if (
-      /\bhello essence\b/.test(text) &&
+      /\bessence\b/.test(text) &&
       !isRecording
     ) {
       startRecording();
@@ -319,7 +342,7 @@ const App: React.FC = () => {
       setTimeout(() => {
         handleCommit();
         resetTranscript();
-      }, 300); // 🔑 allow audio flush
+      }, 1200); // 🔑 allow audio flush
     }
   }, [transcript]);
 
@@ -804,6 +827,14 @@ const App: React.FC = () => {
       element.classList.remove("pdf-export");
     }
   };
+
+  if (!isBackendConnected) {
+    return (
+      <div className="h-screen w-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white overflow-hidden justify-center items-center">
+        <Loader />
+      </div>
+    );
+  }
 
   if (view === "report") {
     return <ProjectReport />;
