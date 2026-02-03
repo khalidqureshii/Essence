@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 load_dotenv()
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Dict, Any
 import uvicorn
 import json
 import asyncio
@@ -12,6 +14,7 @@ from config import Config
 from agents.stt_agent import stt_agent
 from agents.orchestrator import AgentOrchestrator
 from agents.turn_manager import TurnManager
+from agents.report_agent import report_agent
 
 app = FastAPI(title="Essence Agentic Critique API")
 app.add_middleware(
@@ -162,6 +165,27 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.get("/")
 def root():
     return {"message": "Essence Multi-Agent Critique API is running!"}
+
+class ReportRequest(BaseModel):
+    chat_history: List[Dict[str, Any]]
+
+@app.post("/report")
+async def generate_report(request: ReportRequest):
+    logger.info("Generating project report...")
+    
+    # Transform frontend message format to backend format
+    # Frontend sends: {sender: "user"|"bot", text: "...", ...}
+    # Backend expects: {role: "user"|"assistant", content: "..."}
+    transformed_history = []
+    for msg in request.chat_history:
+        transformed_history.append({
+            "role": "assistant" if msg.get("sender") == "bot" else "user",
+            "content": msg.get("text", "")
+        })
+    
+    logger.info(f"Transformed {len(transformed_history)} messages for report generation")
+    report = await report_agent.generate_project_report(transformed_history)
+    return {"report": report}
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

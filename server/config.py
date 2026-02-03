@@ -15,4 +15,8 @@ class Config:
     WHISPER_MODEL = "whisper-large-v3"
     TRANSCRIPTION_LANGUAGE = "en"
 
+    # Report Generation
+    GEMINI_API_KEY = os.getenv("CHATBOT_API_KEY")
+    REPORT_MODEL = "gemini-2.5-flash"
+
     DEBUG = True

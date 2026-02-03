@@ -7,6 +7,7 @@ interface Metric {
   name: string
   score: number
   description: string
+  feedback?: string
 }
 
 interface EvaluationMetricsProps {
@@ -97,14 +98,20 @@ export default function EvaluationMetrics({ metrics }: EvaluationMetricsProps) {
               onClick={() => setSelectedMetric(metric)}
             >
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 flex-1">
                   <span className="text-sm font-bold text-accent">{index + 1}</span>
-                  <div>
+                  <div className="flex-1">
                     <h3 className="text-lg font-semibold text-foreground">{metric.name}</h3>
                     <p className="text-sm text-muted-foreground">{metric.description}</p>
+                    {metric.feedback && (
+                      <div className="mt-2 pt-2 border-t border-border/50">
+                        <p className="text-xs text-muted-foreground mb-1 font-semibold">FEEDBACK</p>
+                        <p className="text-sm text-foreground/90 italic">{metric.feedback}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right ml-4">
                   <p className="text-3xl font-bold text-accent">{metric.score}</p>
                   <p className="text-xs text-muted-foreground">out of 100</p>
                 </div>

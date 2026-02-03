@@ -4,17 +4,19 @@ import { useState } from 'react'
 import { Lightbulb, TrendingUp, AlertCircle } from 'lucide-react'
 import FeedbackCard from './FeedbackCard'
 
-interface FeedbackData {
+
+interface FeedbackSectionProps {
   strengths: string[]
   improvements: string[]
   recommendations: string[]
+  next_steps: {
+    priority_fixes: string
+    short_term_goals: string
+    long_term_goals: string
+  }
 }
 
-interface FeedbackSectionProps {
-  feedback: FeedbackData
-}
-
-export default function FeedbackSection({ feedback }: FeedbackSectionProps) {
+export default function FeedbackSection({ strengths, improvements, recommendations, next_steps }: FeedbackSectionProps) {
   const [expandedSection, setExpandedSection] = useState<'strengths' | 'improvements' | 'recommendations'>('strengths')
 
   return (
@@ -29,8 +31,8 @@ export default function FeedbackSection({ feedback }: FeedbackSectionProps) {
         <button
           onClick={() => setExpandedSection('strengths')}
           className={`text-left p-6 rounded-xl border transition-all ${expandedSection === 'strengths'
-              ? 'bg-gradient-to-br from-emerald-900/20 to-teal-900/10 border-emerald-500/50 shadow-lg shadow-emerald-500/10'
-              : 'bg-card border-border hover:border-border/80'
+            ? 'bg-gradient-to-br from-emerald-900/20 to-teal-900/10 border-emerald-500/50 shadow-lg shadow-emerald-500/10'
+            : 'bg-card border-border hover:border-border/80'
             }`}
         >
           <div className="flex items-center gap-3 mb-2">
@@ -39,14 +41,14 @@ export default function FeedbackSection({ feedback }: FeedbackSectionProps) {
             </div>
             <h3 className="font-semibold text-foreground text-lg">Strengths</h3>
           </div>
-          <p className="text-sm text-muted-foreground">{feedback.strengths.length} key strengths identified</p>
+          <p className="text-sm text-muted-foreground">{strengths.length} key strengths identified</p>
         </button>
 
         <button
           onClick={() => setExpandedSection('improvements')}
           className={`text-left p-6 rounded-xl border transition-all ${expandedSection === 'improvements'
-              ? 'bg-gradient-to-br from-yellow-900/20 to-orange-900/10 border-yellow-500/50 shadow-lg shadow-yellow-500/10'
-              : 'bg-card border-border hover:border-border/80'
+            ? 'bg-gradient-to-br from-yellow-900/20 to-orange-900/10 border-yellow-500/50 shadow-lg shadow-yellow-500/10'
+            : 'bg-card border-border hover:border-border/80'
             }`}
         >
           <div className="flex items-center gap-3 mb-2">
@@ -55,14 +57,14 @@ export default function FeedbackSection({ feedback }: FeedbackSectionProps) {
             </div>
             <h3 className="font-semibold text-foreground text-lg">Areas to Improve</h3>
           </div>
-          <p className="text-sm text-muted-foreground">{feedback.improvements.length} improvements suggested</p>
+          <p className="text-sm text-muted-foreground">{improvements.length} improvements suggested</p>
         </button>
 
         <button
           onClick={() => setExpandedSection('recommendations')}
           className={`text-left p-6 rounded-xl border transition-all ${expandedSection === 'recommendations'
-              ? 'bg-gradient-to-br from-cyan-900/20 to-blue-900/10 border-cyan-500/50 shadow-lg shadow-cyan-500/10'
-              : 'bg-card border-border hover:border-border/80'
+            ? 'bg-gradient-to-br from-cyan-900/20 to-blue-900/10 border-cyan-500/50 shadow-lg shadow-cyan-500/10'
+            : 'bg-card border-border hover:border-border/80'
             }`}
         >
           <div className="flex items-center gap-3 mb-2">
@@ -71,7 +73,7 @@ export default function FeedbackSection({ feedback }: FeedbackSectionProps) {
             </div>
             <h3 className="font-semibold text-foreground text-lg">Recommendations</h3>
           </div>
-          <p className="text-sm text-muted-foreground">{feedback.recommendations.length} features to consider</p>
+          <p className="text-sm text-muted-foreground">{recommendations.length} features to consider</p>
         </button>
       </div>
 
@@ -79,7 +81,7 @@ export default function FeedbackSection({ feedback }: FeedbackSectionProps) {
       <div className="space-y-4">
         {expandedSection === 'strengths' && (
           <div className="space-y-4 animate-in fade-in duration-300">
-            {feedback.strengths.map((strength, index) => (
+            {strengths.map((strength, index) => (
               <FeedbackCard
                 key={index}
                 icon={<TrendingUp className="w-5 h-5" />}
@@ -94,7 +96,7 @@ export default function FeedbackSection({ feedback }: FeedbackSectionProps) {
 
         {expandedSection === 'improvements' && (
           <div className="space-y-4 animate-in fade-in duration-300">
-            {feedback.improvements.map((improvement, index) => (
+            {improvements.map((improvement, index) => (
               <FeedbackCard
                 key={index}
                 icon={<AlertCircle className="w-5 h-5" />}
@@ -109,7 +111,7 @@ export default function FeedbackSection({ feedback }: FeedbackSectionProps) {
 
         {expandedSection === 'recommendations' && (
           <div className="space-y-4 animate-in fade-in duration-300">
-            {feedback.recommendations.map((recommendation, index) => (
+            {recommendations.map((recommendation, index) => (
               <FeedbackCard
                 key={index}
                 icon={<Lightbulb className="w-5 h-5" />}
@@ -133,7 +135,8 @@ export default function FeedbackSection({ feedback }: FeedbackSectionProps) {
             </div>
             <div>
               <h4 className="font-semibold text-foreground mb-1">Priority Fixes</h4>
-              <p className="text-sm text-muted-foreground">Address the error handling and edge case coverage gaps immediately</p>
+              {/* <p className="text-sm text-muted-foreground">Address the error handling and edge case coverage gaps immediately</p> */}
+              <p className="text-sm text-muted-foreground">{next_steps.priority_fixes}</p>
             </div>
           </div>
           <div className="flex gap-4">
@@ -142,7 +145,8 @@ export default function FeedbackSection({ feedback }: FeedbackSectionProps) {
             </div>
             <div>
               <h4 className="font-semibold text-foreground mb-1">Short-term Goals</h4>
-              <p className="text-sm text-muted-foreground">Enhance logging and implement comprehensive test coverage</p>
+              {/* <p className="text-sm text-muted-foreground">Enhance logging and implement comprehensive test coverage</p> */}
+              <p className="text-sm text-muted-foreground">{next_steps.short_term_goals}</p>
             </div>
           </div>
           <div className="flex gap-4">
@@ -151,7 +155,8 @@ export default function FeedbackSection({ feedback }: FeedbackSectionProps) {
             </div>
             <div>
               <h4 className="font-semibold text-foreground mb-1">Long-term Vision</h4>
-              <p className="text-sm text-muted-foreground">Explore advanced features and scale the architecture for growth</p>
+              {/* <p className="text-sm text-muted-foreground">Explore advanced features and scale the architecture for growth</p> */}
+              <p className="text-sm text-muted-foreground">{next_steps.long_term_goals}</p>
             </div>
           </div>
         </div>

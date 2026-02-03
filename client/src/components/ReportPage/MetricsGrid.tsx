@@ -6,6 +6,7 @@ interface Metric {
   name: string
   score: number
   description: string
+  feedback?: string
 }
 
 interface MetricsGridProps {

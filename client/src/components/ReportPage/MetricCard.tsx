@@ -6,6 +6,7 @@ interface Metric {
   name: string
   score: number
   description: string
+  feedback?: string
 }
 
 interface MetricCardProps {
@@ -92,6 +93,16 @@ export default function MetricCard({ metric, isSelected, onClick }: MetricCardPr
                 : 'Needs Attention'}
           </span>
         </div>
+
+        {/* Feedback Section */}
+        {metric.feedback && (
+          <div className="mt-4 pt-4 border-t border-border/20">
+            <p className="text-[10px] font-bold text-accent mb-1 tracking-wider uppercase">Feedback</p>
+            <p className="text-sm text-foreground/80 italic leading-relaxed line-clamp-3">
+              "{metric.feedback}"
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Decorative element */}

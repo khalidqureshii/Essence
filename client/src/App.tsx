@@ -10,7 +10,7 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import ProjectReport from "./Pages/ProjectReport";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 interface Message {
   id: string;
@@ -55,6 +55,13 @@ const App: React.FC = () => {
     return localStorage.getItem("autoplayResponses") === "true";
   });
   const [isBackendConnected, setIsBackendConnected] = useState(false);
+  const [report, setReport] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [reportGenerationCount, setReportGenerationCount] = useState(0)
+
+  const MAX_REPORT_GENERATIONS = 1
+
+
 
   useEffect(() => {
     const checkBackend = async () => {
@@ -828,6 +835,86 @@ const App: React.FC = () => {
     }
   };
 
+  const generateReport = async () => {
+    console.log("🔵 Generate Report clicked")
+
+    if (reportGenerationCount >= MAX_REPORT_GENERATIONS) {
+      console.log("⚠️ Report already generated, switching to report view")
+      setView("report")
+      return
+    }
+
+    try {
+      setLoading(true)
+      console.log("📡 Sending request to /report endpoint with", messages.length, "messages")
+
+      const response = await fetch(`${API_BASE_URL}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_history: messages })
+      })
+
+      console.log("📥 Response received:", response.status)
+      const data = await response.json()
+      console.log("✅ Raw report data:", data)
+
+      // Check for error in response
+      if (data.error) {
+        console.error("❌ Backend returned error:", data.error)
+        toast.error(`Report generation failed: ${data.error}`)
+        return
+      }
+
+      // Validate the report structure
+      if (!data.report) {
+        console.error("❌ No report field in response")
+        toast.error("Invalid response format from server")
+        return
+      }
+
+      // The backend now returns proper JSON object, but handle legacy string format too
+      let parsedReport = data
+
+      if (typeof data.report === 'string') {
+        console.log("⚠️ Report is a string (legacy format), attempting to parse...")
+        try {
+          let reportStr = data.report.trim()
+          // Remove markdown code blocks if present
+          if (reportStr.startsWith('```json')) {
+            reportStr = reportStr.replace(/^```json\s*/, '').replace(/\s*```$/, '')
+          } else if (reportStr.startsWith('```')) {
+            reportStr = reportStr.replace(/^```\s*/, '').replace(/\s*```$/, '')
+          }
+          parsedReport = { report: JSON.parse(reportStr) }
+          console.log("✅ Successfully parsed string JSON report")
+        } catch (parseError) {
+          console.error("❌ Failed to parse report JSON:", parseError)
+          toast.error("Report format is invalid - not valid JSON")
+          return
+        }
+      } else if (typeof data.report === 'object') {
+        console.log("✅ Report is already a JSON object (expected format)")
+        parsedReport = data
+      } else {
+        console.error("❌ Unexpected report format:", typeof data.report)
+        toast.error("Report format is invalid")
+        return
+      }
+
+      console.log("📊 Final parsed report structure:", parsedReport)
+      setReport(parsedReport)
+      setReportGenerationCount(prev => prev + 1)
+
+      setView("report") // ✅ switch to report view
+
+    } catch (error) {
+      console.error("❌ Failed to generate report:", error)
+      toast.error("Failed to generate report")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (!isBackendConnected) {
     return (
       <div className="h-screen w-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white overflow-hidden justify-center items-center">
@@ -837,8 +924,10 @@ const App: React.FC = () => {
   }
 
   if (view === "report") {
-    return <ProjectReport />;
+    return <ProjectReport onBack={() => setView("chat")} report={report} />;
   }
+
+
 
   return (
     <div
@@ -881,7 +970,7 @@ const App: React.FC = () => {
               </label>
               <span className="text-xs text-gray-500 mr-2 uppercase tracking-wide">Ready</span>
               <button
-                onClick={() => setView("report")}
+                onClick={generateReport}
                 className="text-xs px-3 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white transition-colors"
               >
                 Generate Report
