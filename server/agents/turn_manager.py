@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, Dict, AsyncGenerator
+from typing import Optional, Dict, AsyncGenerator, List
 from enum import Enum
 import time
 import asyncio
@@ -12,7 +12,7 @@ class ActiveTurnContext:
     active: bool = False
     transcript: str = ""
     typed_text: str = ""
-    screenshot: Optional[str] = None # Base64 string
+    screenshots: List[str] = field(default_factory=list) # List of Base64 strings
     screen_source: Optional[str] = None # "shared" | "pasted" | None
     sources: Dict[str, bool] = field(default_factory=lambda: {"audio": False, "text": False, "image": False})
     started_at: float = field(default_factory=time.time)
@@ -21,7 +21,7 @@ class ActiveTurnContext:
         self.active = False
         self.transcript = ""
         self.typed_text = ""
-        self.screenshot = None
+        self.screenshots = []
         self.screen_source = None
         self.sources = {"audio": False, "text": False, "image": False}
         self.started_at = time.time()
@@ -42,7 +42,7 @@ class TurnManager:
             "active": self.context.active,
             "transcript": self.context.transcript,
             "typed_text": self.context.typed_text,
-            "has_screenshot": bool(self.context.screenshot),
+            "has_screenshot": len(self.context.screenshots) > 0,
             "sources": self.context.sources,
             "is_responding": self.is_responding
         }
@@ -78,17 +78,17 @@ class TurnManager:
 
         # We store the full Data URI (including prefix) to preserve mime type 
         # for proper frontend rendering when confirmed back.
-        self.context.screenshot = image_b64
+        self.context.screenshots.append(image_b64)
         self.context.screen_source = source
         self.context.sources["image"] = True
         self.context.active = True
-        self.logger.info(f"Context Image Updated from source: {source}")
+        self.logger.info(f"Context Image Added from source: {source}. Total: {len(self.context.screenshots)}")
 
     async def handle_commit(self) -> AsyncGenerator[dict, None]:
         """
         Triggers the interaction.
         """
-        if not self.context.active and not self.context.typed_text and not self.context.screenshot:
+        if not self.context.active and not self.context.typed_text and not self.context.screenshots:
              self.logger.info("Commit called but context is empty/inactive. Ignoring.")
              return
 
@@ -97,28 +97,28 @@ class TurnManager:
 
         full_prompt = f"{self.context.transcript} {self.context.typed_text}".strip()
         
-        self.logger.info(f"Committing Turn. Prompt: {full_prompt}, Has Image: {bool(self.context.screenshot)}")
-
-        # Prepare confirmation text with explicit "Audio:" tag if audio was a source
-        # User requested: "Audio: Transcription of what I said"
-        display_text = full_prompt
+        self.logger.info(f"Committing Turn. Prompt: {full_prompt}, Images: {len(self.context.screenshots)}")
 
         # Send confirmation to client
         yield {
             "type": "commit_confirmation", 
             "payload": {
-                "text": display_text, 
-                "image": self.context.screenshot # Sends full Data URI now
+                "text": full_prompt, 
+                "images": self.context.screenshots # Sends list of full Data URIs
             }
         }
 
         try:
-            # Orchestrator likely expects raw base64 (no header), so we strip it here for processing
-            processing_image = self.context.screenshot
-            if processing_image and "," in processing_image:
-                processing_image = processing_image.split(",", 1)[1]
+            # Orchestrator likely expects raw base64 (no header), so we strip them here for processing
+            processing_images = []
+            for img in self.context.screenshots:
+                if "," in img:
+                    processing_images.append(img.split(",", 1)[1])
+                else:
+                    processing_images.append(img)
 
-            async for chunk in self.orchestrator.run_flow(full_prompt, processing_image):
+            # Note: We need to update Orchestrator to handle multiple images
+            async for chunk in self.orchestrator.run_flow(full_prompt, processing_images):
                 yield {"type": "response_chunk", "payload": chunk}
                 
         except Exception as e:

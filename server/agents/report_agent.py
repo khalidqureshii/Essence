@@ -39,9 +39,9 @@ class ReportAgent:
             prompt = f"""
             You are an expert software project evaluator.
 
-            Your task is to generate a structured evaluation report about a software project based ONLY on the information previously provided (conversation, demo explanation, or project walkthrough).
+            Your task is to generate a structured evaluation report about a software project based on the information provided, including the conversation text and visual evidence from screenshots shared during the session.
 
-            Conversation History:
+            Conversation History (Role: Content):
             {formatted_history}
 
             IMPORTANT RULES:

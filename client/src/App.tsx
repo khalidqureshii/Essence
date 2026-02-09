@@ -1002,7 +1002,7 @@ const App: React.FC = () => {
         <div ref={chatEndRef} />
 
         {/* Context Preview Indicator - Always show if image pending or active */}
-        {(status === "ACTIVE" || status === "RESPONDING" || pendingImage) && (
+        {(status === "ACTIVE" || status === "RESPONDING" || pendingImage.length > 0) && (
           <div className="fixed bottom-24 right-4 flex flex-col items-end space-y-2 animate-in fade-in slide-in-from-bottom-2 z-50">
             {pendingImage.length > 0 && (
               <div className="flex gap-2">
@@ -1021,7 +1021,7 @@ const App: React.FC = () => {
                 ))}
               </div>
             )}
-            {status === "ACTIVE" && !pendingImage && (
+            {status === "ACTIVE" && pendingImage.length === 0 && (
               <div className="bg-gray-800/90 border border-teal-500/50 p-3 rounded-lg backdrop-blur-sm shadow-xl flex items-center space-x-3">
                 <div className="w-2 h-2 bg-teal-500 rounded-full animate-pulse" />
                 <span className="text-xs text-teal-200 font-medium">Turn Active</span>
@@ -1049,7 +1049,7 @@ const App: React.FC = () => {
           disabled={status === "RESPONDING"}
         />
         <div className="text-xs text-gray-500 text-center mt-2">
-          Say "Essence" to start • "Over" to send • "Screenshot" to capture
+          Say "Essence" to start • "Over" to send
         </div>
       </footer>
     </div>
