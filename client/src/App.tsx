@@ -58,6 +58,7 @@ const App: React.FC = () => {
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(false)
   const [reportGenerationCount, setReportGenerationCount] = useState(0)
+  const [evaluationProgress, setEvaluationProgress] = useState(0);
 
   const MAX_REPORT_GENERATIONS = 1
 
@@ -931,125 +932,144 @@ const App: React.FC = () => {
 
   return (
     <div
-      className="h-screen w-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white overflow-hidden"
-      onPaste={handlePaste} // Global paste listener for simplicity
+      className="h-screen w-screen flex flex-col bg-white text-gray-900 overflow-hidden"
+      onPaste={handlePaste}
     >
       <Toaster position="top-center" toastOptions={{
-        style: { background: '#333', color: '#fff' }
+        style: { background: '#f5f5f5', color: '#000' }
       }} />
-      {/* Header */}
-      <header className="p-4 text-center border-b border-gray-700 shadow-md flex-shrink-0 flex justify-between items-center transition-colors duration-500"
-        style={{ borderColor: status === "ACTIVE" ? "#34d399" : status === "RESPONDING" ? "#60a5fa" : "#374151" }}
-      >
-        <div className="flex-1 text-center">
-          <h1 className="text-2xl font-bold text-teal-400">Essence</h1>
-          <p className="text-xs uppercase tracking-widest font-semibold mt-1"
-            style={{ color: status === "ACTIVE" ? "#34d399" : status === "RESPONDING" ? "#60a5fa" : "#9ca3af" }}>
-            {status}
-          </p>
-        </div>
-        <div>
-          {/* Header controls removed as per user request */}
-          {isRecording ? (
-            <div className="flex items-center animate-pulse">
-              <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
-              <span className="text-xs text-red-400 font-bold tracking-wider">RECORDING</span>
-            </div>
-          ) : (
-            <div className="flex items-center space-x-4">
-              <label className="flex items-center cursor-pointer space-x-2 group">
-                <input
-                  type="checkbox"
-                  checked={autoplayResponses}
-                  onChange={toggleAutoplay}
-                  className="form-checkbox h-4 w-4 text-teal-500 rounded border-gray-600 focus:ring-teal-500 focus:ring-offset-gray-900 bg-gray-800 transition-colors"
-                />
-                <span className="text-xs text-gray-400 font-medium uppercase tracking-wide group-hover:text-teal-400 transition-colors select-none">
-                  Auto-play
-                </span>
-              </label>
-              <span className="text-xs text-gray-500 mr-2 uppercase tracking-wide">Ready</span>
-              <button
-                onClick={generateReport}
-                className="text-xs px-3 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white transition-colors"
-              >
-                Generate Report
-              </button>
-              <button
-                onClick={exportChatToPDF}
-                className="text-xs px-3 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white transition-colors"
-              >
-                Download PDF
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
 
-      {/* Chat Area (scrollable only here) */}
-      <main id="chat-export" className="flex-1 overflow-y-auto px-4 md:px-16 py-6 space-y-4 scrollbar-hide relative">
-        {messages.map((msg, i) => (
-          <ChatMessage
-            key={i}
-            sender={msg.sender}
-            text={msg.text}
-            image={msg.image}
-            images={msg.images}
-            isPlaying={speakingText === msg.text}
-            onPlay={handleManualMicClick}
-          />
-        ))}
-        <div ref={chatEndRef} />
-
-        {/* Context Preview Indicator - Always show if image pending or active */}
-        {(status === "ACTIVE" || status === "RESPONDING" || pendingImage.length > 0) && (
-          <div className="fixed bottom-24 right-4 flex flex-col items-end space-y-2 animate-in fade-in slide-in-from-bottom-2 z-50">
-            {pendingImage.length > 0 && (
-              <div className="flex gap-2">
-                {pendingImage.map((img, idx) => (
-                  <div key={idx} className="relative group">
-                    <img
-                      src={img}
-                      alt={`Pending Context ${idx + 1}`}
-                      onError={(e) => console.error("Image load error", e)}
-                      className="w-24 h-auto rounded-lg border-2 border-teal-500/50 shadow-lg object-cover bg-gray-900"
-                    />
-                    <div className="absolute -top-2 -right-2 bg-teal-500 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full z-10">
-                      IMG
-                    </div>
-                  </div>
-                ))}
+      {/* Minimalist Header */}
+      <header className="border-b border-gray-200 px-6 md:px-12 py-4 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-light tracking-tight text-cyan-600">Essence</h1>
+            <p className="text-xs text-gray-500 uppercase tracking-widest mt-1 font-medium">
+              Agentic Critic
+            </p>
+          </div>
+          <div className="flex items-center space-x-6">
+            {isRecording ? (
+              <div className="flex items-center space-x-2 bg-red-50 px-4 py-2 rounded-full">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                <span className="text-xs text-red-600 font-semibold">RECORDING</span>
               </div>
-            )}
-            {status === "ACTIVE" && pendingImage.length === 0 && (
-              <div className="bg-gray-800/90 border border-teal-500/50 p-3 rounded-lg backdrop-blur-sm shadow-xl flex items-center space-x-3">
-                <div className="w-2 h-2 bg-teal-500 rounded-full animate-pulse" />
-                <span className="text-xs text-teal-200 font-medium">Turn Active</span>
+            ) : (
+              <div className="flex items-center space-x-4">
+                <label className="flex items-center space-x-2 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={autoplayResponses}
+                    onChange={toggleAutoplay}
+                    className="w-4 h-4 accent-cyan-600 rounded"
+                  />
+                  <span className="text-xs text-gray-600 font-medium group-hover:text-cyan-600 transition-colors">Auto-play</span>
+                </label>
+                <button
+                  onClick={generateReport}
+                  className="text-xs px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white transition-colors font-medium"
+                >
+                  Generate Report
+                </button>
+                <button
+                  onClick={exportChatToPDF}
+                  className="text-xs px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-900 transition-colors font-medium"
+                >
+                  Download PDF
+                </button>
               </div>
             )}
           </div>
-        )}
+        </div>
+
+        {/* Status Indicator with Progress Bar */}
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+              Status: {status}
+            </span>
+            {status === "RESPONDING" && (
+              <span className="text-xs text-cyan-600 font-medium">Evaluating...</span>
+            )}
+          </div>
+          <div className="w-full bg-gray-200 h-1 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-cyan-500 to-cyan-600 transition-all duration-500 ease-out rounded-full"
+              style={{
+                width: status === "RESPONDING" ? "100%" : status === "ACTIVE" ? "50%" : "0%"
+              }}
+            ></div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Chat Area - Centered & Spacious */}
+      <main id="chat-export" className="flex-1 overflow-y-auto px-6 md:px-20 py-8 space-y-6">
+        <div className="max-w-3xl mx-auto space-y-6">
+          {messages.length === 0 ? (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-6xl mb-4 opacity-20">💬</div>
+                <p className="text-gray-500 font-light">Start a conversation</p>
+              </div>
+            </div>
+          ) : (
+            messages.map((msg, i) => (
+              <ChatMessage
+                key={i}
+                sender={msg.sender}
+                text={msg.text}
+                image={msg.image}
+                images={msg.images}
+                isPlaying={speakingText === msg.text}
+                onPlay={handleManualMicClick}
+              />
+            ))
+          )}
+          <div ref={chatEndRef} />
+
+          {/* Floating Context Preview */}
+          {pendingImage.length > 0 && (
+            <div className="flex gap-3 flex-wrap justify-end">
+              {pendingImage.map((img, idx) => (
+                <div key={idx} className="relative group">
+                  <img
+                    src={img}
+                    alt={`Context ${idx + 1}`}
+                    className="w-20 h-20 rounded-lg border-2 border-cyan-500/30 shadow-sm object-cover"
+                  />
+                  <div className="absolute -top-2 -right-2 bg-cyan-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                    {idx + 1}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </main>
 
-      <footer className="p-4 border-t border-gray-700 bg-gray-900 flex-shrink-0">
-        <MessageInput
-          onSend={() => {
-            if (isRecording) finishRecording();
-            else handleCommit();
-          }}
-          value={currentDraft} // Controlled input
-          onInputChange={(text) => handleSendText(text)}
-          onMicClick={toggleMic}
-          onCameraClick={handleScreenshot}
-          onCancelRecording={cancelRecording}
-          onShareClick={startScreenShare}
-          onStopSharing={stopScreenShare}
-          isRecording={isRecording}
-          isSharing={isSharing}
-          disabled={status === "RESPONDING"}
-        />
-        <div className="text-xs text-gray-500 text-center mt-2">
-          Say "Essence" to start • "Over" to send
+      {/* Input Footer - Sticky */}
+      <footer className="border-t border-gray-200 bg-white px-6 md:px-20 py-4 flex-shrink-0">
+        <div className="max-w-3xl mx-auto">
+          <MessageInput
+            onSend={() => {
+              if (isRecording) finishRecording();
+              else handleCommit();
+            }}
+            value={currentDraft}
+            onInputChange={(text) => handleSendText(text)}
+            onMicClick={toggleMic}
+            onCameraClick={handleScreenshot}
+            onCancelRecording={cancelRecording}
+            onShareClick={startScreenShare}
+            onStopSharing={stopScreenShare}
+            isRecording={isRecording}
+            isSharing={isSharing}
+            disabled={status === "RESPONDING"}
+          />
+          <p className="text-xs text-gray-400 text-center mt-3 font-light">
+            Say <span className="font-semibold text-gray-600">Essence</span> to start • <span className="font-semibold text-gray-600">Over</span> to send
+          </p>
         </div>
       </footer>
     </div>

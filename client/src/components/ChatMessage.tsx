@@ -14,23 +14,23 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ sender, text, image, images, 
   const isUser = sender === "user";
 
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4 animate-in fade-in slide-in-from-bottom-2`}>
+    <div className={`flex ${isUser ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-2`}>
       <div
-        className={`message-bubble ${isUser ? "user-message" : "bot-message"} max-w-[80%] rounded-2xl px-5 py-3 shadow-sm ${isUser
-          ? "bg-teal-600 text-white rounded-br-none"
-          : "bg-gray-800 text-gray-100 rounded-bl-none border border-gray-700"
-          }`}
+        className={`max-w-md rounded-2xl px-4 py-3 ${
+          isUser
+            ? "bg-cyan-100 text-gray-900 rounded-br-sm shadow-sm"
+            : "bg-gray-100 text-gray-900 rounded-bl-sm shadow-sm"
+        }`}
       >
-        {/* Single Image Support (Legacy/Simple) */}
+        {/* Images */}
         {image && !images && (
           <img
             src={image}
             alt="Context"
-            className="mb-3 rounded-lg max-h-60 w-auto object-cover border border-white/10"
+            className="mb-3 rounded-lg max-h-56 w-auto object-cover border border-gray-200"
           />
         )}
 
-        {/* Multiple Images Support */}
         {images && images.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-3">
             {images.map((img, idx) => (
@@ -38,26 +38,27 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ sender, text, image, images, 
                 key={idx}
                 src={img}
                 alt={`Context ${idx + 1}`}
-                className="rounded-lg max-h-40 w-auto object-cover border border-white/10"
+                className="rounded-lg max-h-40 w-auto object-cover border border-gray-200"
               />
             ))}
           </div>
         )}
 
-        <div className="prose prose-invert prose-sm max-w-none leading-relaxed">
+        {/* Text Content */}
+        <div className="prose prose-sm max-w-none leading-relaxed text-gray-900">
           <ReactMarkdown
             components={{
               code: (props: any) => {
                 const { inline, children } = props;
                 if (!inline) {
                   return (
-                    <pre className="bg-gray-900 text-gray-100 p-2 rounded-lg overflow-x-auto my-2 border border-gray-700">
+                    <pre className="bg-gray-200 text-gray-900 p-2 rounded overflow-x-auto my-2 border border-gray-300">
                       <code>{children}</code>
                     </pre>
                   );
                 }
                 return (
-                  <code className="bg-gray-700 text-gray-100 px-1 py-0.5 rounded text-sm">
+                  <code className="bg-gray-200 text-gray-900 px-1 py-0.5 rounded text-sm">
                     {children}
                   </code>
                 );
@@ -67,7 +68,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ sender, text, image, images, 
                   href={props.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-teal-400 hover:underline hover:text-teal-300"
+                  className="text-cyan-600 hover:underline font-medium"
                 >
                   {props.children}
                 </a>
@@ -79,14 +80,16 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ sender, text, image, images, 
           </ReactMarkdown>
         </div>
 
+        {/* Listen Button */}
         {!isUser && onPlay && (
-          <div className="mt-2 flex justify-start">
+          <div className="mt-3 flex justify-start">
             <button
               onClick={() => onPlay(text)}
-              className={`listen-button text-xs uppercase font-semibold tracking-wider p-1 rounded transition-colors flex items-center gap-1 ${isPlaying
-                  ? "text-red-400 hover:text-red-300 hover:bg-white/5"
-                  : "text-gray-400 hover:text-teal-400 hover:bg-white/5"
-                }`}
+              className={`text-xs font-semibold tracking-wide p-2 rounded transition-colors flex items-center gap-2 ${
+                isPlaying
+                  ? "text-red-600 bg-red-50"
+                  : "text-cyan-600 hover:bg-cyan-50"
+              }`}
               title={isPlaying ? "Stop" : "Listen"}
             >
               {isPlaying ? (
