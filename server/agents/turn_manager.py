@@ -38,13 +38,17 @@ class TurnManager:
         self.triggered_commands = {"screenshot": False}
 
     def get_context_snapshot(self):
+        progress_data = self.orchestrator.conversation_manager.get_progress_data()
         return {
             "active": self.context.active,
             "transcript": self.context.transcript,
             "typed_text": self.context.typed_text,
             "has_screenshot": len(self.context.screenshots) > 0,
             "sources": self.context.sources,
-            "is_responding": self.is_responding
+            "is_responding": self.is_responding,
+            "macro_completed_chunks": progress_data["macro_completed_chunks"],
+            "micro_section_progress": progress_data["micro_section_progress"],
+            "section": progress_data["section"]
         }
 
     async def process_audio_chunk(self, audio_bytes: bytes) -> AsyncGenerator[dict, None]:

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useReducer } from "react";
 import ChatMessage from "./components/ChatMessage";
 import MessageInput from "./components/MessageInput";
 import Loader from "./components/Loader";
@@ -9,6 +9,10 @@ import SpeechRecognition, {
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import ProjectReport from "./Pages/ProjectReport";
+import Navbar from "./components/Navbar";
+import SectionIndicator from "./components/SectionIndicator";
+import SectionProgressBar from "./components/SectionProgressBar";
+
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://essence-gf00.onrender.com";
 
@@ -32,6 +36,212 @@ declare global {
 
 // Derive WS URL from API_BASE_URL (http -> ws, https -> wss)
 const WS_URL = API_BASE_URL.replace(/^http/, "ws") + "/chatbot/ws";
+
+const EVALUATION_SECTIONS = [
+  { key: "PROJECT_UNDERSTANDING", label: "Project Understanding" },
+  { key: "UI_UX", label: "UI & User Experience" },
+  { key: "DESIGN_DECISIONS", label: "Design Decisions & Trade-offs" },
+  { key: "TECHNICAL_AWARENESS", label: "Technical Awareness" },
+  { key: "LIMITATIONS_IMPROVEMENTS", label: "Limitations & Improvements" }
+] as const;
+
+type EvaluationSectionKey = typeof EVALUATION_SECTIONS[number]["key"];
+
+interface EvaluationState {
+  currentSectionIndex: number;
+  currentSection: EvaluationSectionKey;
+  sectionConfidence: number;
+  sectionProgress: number;
+  completedSections: number;
+}
+
+type AnswerQuality = "strong" | "partial" | "weak";
+type EvaluationAction = {
+  type: "ANSWER_EVALUATED";
+  payload: { text: string };
+};
+
+const SECTION_COMPLETION_THRESHOLD = 0.75;
+
+const invalidResponses = new Set([
+  "no",
+  "nope",
+  "nah",
+  "n/a",
+  "na",
+  "idk",
+  "i dont know",
+  "i don't know",
+  "dont know",
+  "not sure",
+  "none",
+  "nothing",
+  "skip",
+  "refuse",
+  "cant",
+  "can't",
+  "cannot",
+  "wont",
+  "won't",
+  "no comment"
+]);
+
+const descriptiveKeywords = [
+  "because",
+  "therefore",
+  "however",
+  "but",
+  "tradeoff",
+  "trade-off",
+  "constraint",
+  "user",
+  "users",
+  "audience",
+  "flow",
+  "layout",
+  "color",
+  "typography",
+  "component",
+  "state",
+  "backend",
+  "frontend",
+  "api",
+  "performance",
+  "accessibility",
+  "responsive",
+  "testing",
+  "scalability",
+  "security",
+  "data",
+  "cache",
+  "latency",
+  "error",
+  "edge",
+  "goal",
+  "objective",
+  "feature",
+  "problem",
+  "solution",
+  "design",
+  "implementation",
+  "architecture",
+  "interface",
+  "interaction",
+  "usability",
+  "feedback",
+  "limitation",
+  "improvement",
+  "decision",
+  "trade-offs"
+];
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
+const analyzeAnswer = (text: string) => {
+  const normalized = text.trim().toLowerCase();
+  const sanitized = normalized.replace(/[^\w\s'-]/g, "").trim();
+
+  if (!sanitized) {
+    return { quality: "weak" as AnswerQuality, score: 0, isInvalid: true };
+  }
+
+  if (invalidResponses.has(sanitized)) {
+    return { quality: "weak" as AnswerQuality, score: 0, isInvalid: true };
+  }
+
+  const words = sanitized.split(/\s+/).filter(Boolean);
+  const wordCount = words.length;
+  const charCount = sanitized.replace(/\s+/g, "").length;
+  const keywordHits = descriptiveKeywords.reduce((count, keyword) => {
+    return sanitized.includes(keyword) ? count + 1 : count;
+  }, 0);
+
+  if (wordCount <= 2 && words[0] === "no") {
+    return { quality: "weak" as AnswerQuality, score: 0, isInvalid: true };
+  }
+
+  const score = clamp(
+    (Math.min(wordCount, 40) / 40 +
+      Math.min(charCount, 200) / 200 +
+      Math.min(keywordHits, 5) / 5) / 3,
+    0,
+    1
+  );
+
+  const quality: AnswerQuality =
+    wordCount >= 20 || charCount >= 120 || keywordHits >= 3
+      ? "strong"
+      : wordCount >= 8 || charCount >= 50 || keywordHits >= 1
+        ? "partial"
+        : "weak";
+
+  return { quality, score, isInvalid: false };
+};
+
+const getConfidenceIncrement = (quality: AnswerQuality, score: number) => {
+  switch (quality) {
+    case "strong":
+      return 0.25 + 0.10 * score;
+    case "partial":
+      return 0.10 + 0.10 * score;
+    default:
+      return 0.01 + 0.04 * score;
+  }
+};
+
+const evaluationReducer = (state: EvaluationState, action: EvaluationAction): EvaluationState => {
+  switch (action.type) {
+    case "ANSWER_EVALUATED": {
+      const { quality, score } = analyzeAnswer(action.payload.text);
+      const increment = getConfidenceIncrement(quality, score);
+
+      const nextConfidence = clamp(state.sectionConfidence + increment, 0, 1);
+      const nextProgress = clamp(nextConfidence * 100, 0, 100);
+
+      let nextState: EvaluationState = {
+        ...state,
+        sectionConfidence: nextConfidence,
+        sectionProgress: nextProgress
+      };
+
+      if (
+        nextConfidence >= SECTION_COMPLETION_THRESHOLD &&
+        state.completedSections < EVALUATION_SECTIONS.length
+      ) {
+        const nextSectionIndex = Math.min(
+          state.currentSectionIndex + 1,
+          EVALUATION_SECTIONS.length - 1
+        );
+        const nextSection = EVALUATION_SECTIONS[nextSectionIndex];
+        const nextCompletedSections = Math.min(
+          state.completedSections + 1,
+          EVALUATION_SECTIONS.length
+        );
+
+        if (state.currentSectionIndex !== nextSectionIndex) {
+          nextState = {
+            ...nextState,
+            currentSectionIndex: nextSectionIndex,
+            currentSection: nextSection.key,
+            sectionConfidence: 0,
+            sectionProgress: 0,
+            completedSections: nextCompletedSections
+          };
+        } else {
+          nextState = {
+            ...nextState,
+            completedSections: nextCompletedSections
+          };
+        }
+      }
+
+      return nextState;
+    }
+    default:
+      return state;
+  }
+};
 
 const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
@@ -58,6 +268,13 @@ const App: React.FC = () => {
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(false)
   const [reportGenerationCount, setReportGenerationCount] = useState(0)
+  const [evaluationState, dispatchEvaluation] = useReducer(evaluationReducer, {
+    currentSectionIndex: 0,
+    currentSection: EVALUATION_SECTIONS[0].key,
+    sectionConfidence: 0,
+    sectionProgress: 0,
+    completedSections: 0
+  });
 
   const MAX_REPORT_GENERATIONS = 1
 
@@ -249,6 +466,8 @@ const App: React.FC = () => {
               // Clear immediately as it's consumed
               lastSentImageRef.current = []; // cleared in handleCommit already but safe to ensure
 
+              const payloadText = typeof data.payload?.text === "string" ? data.payload.text : "";
+
               setMessages(prev => {
                 // Support both single 'image' and multiple 'images' from payload
                 let imagesToUse: string[] = [];
@@ -263,7 +482,7 @@ const App: React.FC = () => {
                 }
 
                 const hasImages = imagesToUse.length > 0;
-                const displayText = data.payload.text || (hasImages ? "" : "🎤 (Audio Message)");
+                const displayText = payloadText || (hasImages ? "" : "🎤 (Audio Message)");
 
                 return [...prev, {
                   id: crypto.randomUUID(),
@@ -272,6 +491,24 @@ const App: React.FC = () => {
                   images: imagesToUse
                 }];
               });
+
+              dispatchEvaluation({ type: "ANSWER_EVALUATED", payload: { text: payloadText } });
+
+              const analysis = analyzeAnswer(payloadText);
+              if (analysis.isInvalid) {
+                const sectionLabel =
+                  EVALUATION_SECTIONS.find(section => section.key === evaluationState.currentSection)?.label
+                  ?? EVALUATION_SECTIONS[0].label;
+                setMessages(prev => [
+                  ...prev,
+                  {
+                    id: crypto.randomUUID(),
+                    sender: "bot",
+                    text: `Could you share a bit more detail about ${sectionLabel.toLowerCase()}?`,
+                    isFinal: true
+                  }
+                ]);
+              }
               break;
           }
         } catch (e) {
@@ -927,7 +1164,9 @@ const App: React.FC = () => {
     return <ProjectReport onBack={() => setView("chat")} report={report} />;
   }
 
-
+  const currentSectionLabel =
+    EVALUATION_SECTIONS.find(section => section.key === evaluationState.currentSection)?.label
+    ?? EVALUATION_SECTIONS[0].label;
 
   return (
     <div
@@ -938,53 +1177,24 @@ const App: React.FC = () => {
         style: { background: '#333', color: '#fff' }
       }} />
       {/* Header */}
-      <header className="p-4 text-center border-b border-gray-700 shadow-md flex-shrink-0 flex justify-between items-center transition-colors duration-500"
-        style={{ borderColor: status === "ACTIVE" ? "#34d399" : status === "RESPONDING" ? "#60a5fa" : "#374151" }}
-      >
-        <div className="flex-1 text-center">
-          <h1 className="text-2xl font-bold text-teal-400">Essence</h1>
-          <p className="text-xs uppercase tracking-widest font-semibold mt-1"
-            style={{ color: status === "ACTIVE" ? "#34d399" : status === "RESPONDING" ? "#60a5fa" : "#9ca3af" }}>
-            {status}
-          </p>
-        </div>
-        <div>
-          {/* Header controls removed as per user request */}
-          {isRecording ? (
-            <div className="flex items-center animate-pulse">
-              <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
-              <span className="text-xs text-red-400 font-bold tracking-wider">RECORDING</span>
-            </div>
-          ) : (
-            <div className="flex items-center space-x-4">
-              <label className="flex items-center cursor-pointer space-x-2 group">
-                <input
-                  type="checkbox"
-                  checked={autoplayResponses}
-                  onChange={toggleAutoplay}
-                  className="form-checkbox h-4 w-4 text-teal-500 rounded border-gray-600 focus:ring-teal-500 focus:ring-offset-gray-900 bg-gray-800 transition-colors"
-                />
-                <span className="text-xs text-gray-400 font-medium uppercase tracking-wide group-hover:text-teal-400 transition-colors select-none">
-                  Auto-play
-                </span>
-              </label>
-              <span className="text-xs text-gray-500 mr-2 uppercase tracking-wide">Ready</span>
-              <button
-                onClick={generateReport}
-                className="text-xs px-3 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white transition-colors"
-              >
-                Generate Report
-              </button>
-              <button
-                onClick={exportChatToPDF}
-                className="text-xs px-3 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white transition-colors"
-              >
-                Download PDF
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
+      <Toaster position="top-center" toastOptions={{
+        style: { background: '#333', color: '#fff' }
+      }} />
+      
+      <Navbar 
+        status={status}
+        isRecording={isRecording}
+        autoplayResponses={autoplayResponses}
+        onToggleAutoplay={toggleAutoplay}
+        onGenerateReport={generateReport}
+        onExportPDF={exportChatToPDF}
+        macroCompletedChunks={evaluationState.completedSections}
+      />
+
+      <SectionIndicator section={currentSectionLabel} />
+      <div className="h-16 flex items-center justify-center px-4 bg-gray-900/40 border-b border-gray-800/50 backdrop-blur-sm">
+        <SectionProgressBar progress={evaluationState.sectionProgress} />
+      </div>
 
       {/* Chat Area (scrollable only here) */}
       <main id="chat-export" className="flex-1 overflow-y-auto px-4 md:px-16 py-6 space-y-4 scrollbar-hide relative">
@@ -1057,3 +1267,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+
