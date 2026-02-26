@@ -3,79 +3,109 @@
 
 @custom-variant dark (&:is(.dark *));
 
+
 :root {
-  --background: #0f1e2f;
-  --foreground: #e8f0f8;
-  --card: #1a2d42;
-  --card-foreground: #e8f0f8;
-  --popover: #1a2d42;
-  --popover-foreground: #e8f0f8;
-  --primary: #1a2d42;
-  --primary-foreground: #e8f0f8;
-  --secondary: #2d4157;
-  --secondary-foreground: #e8f0f8;
-  --muted: #2d4157;
-  --muted-foreground: #8ba5b8;
-  --accent: #00d9ff;
-  --accent-foreground: #0f1e2f;
+  /* SaaS Dark Color System */
+  --bg-main: #0B1220;
+  --bg-section: #111A2B;
+  --bg-card: #162238;
+  --bg-hover: #1E2D47;
+
+  --text-primary: #E6EDF3;
+  --text-secondary: #9FB3C8;
+  --text-muted: #5C6F89;
+
+  --accent-primary: #00E0C6;
+  --accent-hover: #00BFA5;
+  --accent-secondary: #4C7DFF;
+
+  /* Tailwind Core Variables Mapping */
+  --background: var(--bg-main);
+  --foreground: var(--text-primary);
+  --card: var(--bg-card);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-card);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--accent-primary);
+  --primary-foreground: #0B1220;
+  --secondary: var(--bg-hover);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--bg-section);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--accent-primary);
+  --accent-foreground: #0B1220;
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: #2d4157;
-  --input: #1a2d42;
-  --ring: #00d9ff;
-  --chart-1: #00d9ff;
+  --border: rgba(0, 224, 198, 0.15);
+  --input: var(--bg-card);
+  --ring: var(--accent-primary);
+  --chart-1: var(--accent-primary);
   --chart-2: #0aff8f;
   --chart-3: #ff006e;
   --chart-4: #ffbe0b;
   --chart-5: #8338ec;
-  --radius: 0.625rem;
-  --sidebar: #1a2d42;
-  --sidebar-foreground: #e8f0f8;
-  --sidebar-primary: #00d9ff;
-  --sidebar-primary-foreground: #0f1e2f;
-  --sidebar-accent: #00d9ff;
-  --sidebar-accent-foreground: #0f1e2f;
-  --sidebar-border: #2d4157;
-  --sidebar-ring: #00d9ff;
+  --radius: 0.875rem; /* ~14px */
+  --sidebar: var(--bg-card);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--accent-primary);
+  --sidebar-primary-foreground: #0B1220;
+  --sidebar-accent: var(--bg-hover);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--accent-primary);
 }
 
+
 .dark {
-  --background: #0f1e2f;
-  --foreground: #e8f0f8;
-  --card: #1a2d42;
-  --card-foreground: #e8f0f8;
-  --popover: #1a2d42;
-  --popover-foreground: #e8f0f8;
-  --primary: #1a2d42;
-  --primary-foreground: #e8f0f8;
-  --secondary: #2d4157;
-  --secondary-foreground: #e8f0f8;
-  --muted: #2d4157;
-  --muted-foreground: #8ba5b8;
-  --accent: #00d9ff;
-  --accent-foreground: #0f1e2f;
+  --bg-main: #0B1220;
+  --bg-section: #111A2B;
+  --bg-card: #162238;
+  --bg-hover: #1E2D47;
+
+  --text-primary: #E6EDF3;
+  --text-secondary: #9FB3C8;
+  --text-muted: #5C6F89;
+
+  --accent-primary: #00E0C6;
+  --accent-hover: #00BFA5;
+  --accent-secondary: #4C7DFF;
+
+  --background: var(--bg-main);
+  --foreground: var(--text-primary);
+  --card: var(--bg-card);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-card);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--accent-primary);
+  --primary-foreground: #0B1220;
+  --secondary: var(--bg-hover);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--bg-section);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--accent-primary);
+  --accent-foreground: #0B1220;
   --destructive: #ff4757;
-  --destructive-foreground: #e8f0f8;
-  --border: #2d4157;
-  --input: #1a2d42;
-  --ring: #00d9ff;
-  --chart-1: #00d9ff;
+  --destructive-foreground: var(--text-primary);
+  --border: rgba(0, 224, 198, 0.15);
+  --input: var(--bg-card);
+  --ring: var(--accent-primary);
+  --chart-1: var(--accent-primary);
   --chart-2: #0aff8f;
   --chart-3: #ff006e;
   --chart-4: #ffbe0b;
   --chart-5: #8338ec;
-  --sidebar: #1a2d42;
-  --sidebar-foreground: #e8f0f8;
-  --sidebar-primary: #00d9ff;
-  --sidebar-primary-foreground: #0f1e2f;
-  --sidebar-accent: #00d9ff;
-  --sidebar-accent-foreground: #0f1e2f;
-  --sidebar-border: #2d4157;
-  --sidebar-ring: #00d9ff;
+  --sidebar: var(--bg-card);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--accent-primary);
+  --sidebar-primary-foreground: #0B1220;
+  --sidebar-accent: var(--bg-hover);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--accent-primary);
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
+  --font-sans: 'Inter', sans-serif;
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -121,7 +151,53 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    /* Subtle premium radial gradients */
+    background: 
+      radial-gradient(circle at top left, rgba(0, 224, 198, 0.08) 0%, transparent 40%),
+      radial-gradient(circle at bottom right, rgba(76, 125, 255, 0.06) 0%, transparent 45%),
+      var(--bg-main) !important;
+    background-attachment: fixed !important;
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* Typography Overrides */
+  h1, h2, h3, h4, h5, h6,
+  caption,
+  th {
+    font-family: 'Sora', sans-serif;
+    font-weight: 600;
+  }
+
+  h1 { font-weight: 700; }
+
+  /* Ensure inputs, selects, and textareas use Inter */
+  input, select, textarea {
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* Target specific UI elements dynamically to prevent refactoring */
+  .font-semibold, .font-bold {
+    font-family: 'Sora', sans-serif;
+  }
+
+  /* Card & Input Polish */
+  .rounded-xl, .rounded-lg, .rounded-2xl {
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.25), 0 0 3px rgba(0, 224, 198, 0.05);
+  }
+
+  .bg-card, .bg-popover, .bg-secondary {
+    border: 1px solid var(--border);
+  }
+
+  /* Interactive Elements Polish */
+  button.bg-primary {
+    transition: all 0.2s ease;
+  }
+  button.bg-primary:hover {
+    background-color: var(--accent-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 224, 198, 0.2);
   }
 }
 

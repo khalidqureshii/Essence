@@ -17,8 +17,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ sender, text, image, images, 
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4 animate-in fade-in slide-in-from-bottom-2`}>
       <div
         className={`message-bubble ${isUser ? "user-message" : "bot-message"} max-w-[80%] rounded-2xl px-5 py-3 shadow-sm ${isUser
-          ? "bg-teal-600 text-white rounded-br-none"
-          : "bg-gray-800 text-gray-100 rounded-bl-none border border-gray-700"
+          ? "bg-primary text-primary-foreground rounded-br-none"
+          : "bg-card text-foreground rounded-bl-none border border-border"
           }`}
       >
         {/* Single Image Support (Legacy/Simple) */}
@@ -51,13 +51,13 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ sender, text, image, images, 
                 const { inline, children } = props;
                 if (!inline) {
                   return (
-                    <pre className="bg-gray-900 text-gray-100 p-2 rounded-lg overflow-x-auto my-2 border border-gray-700">
+                    <pre className="bg-background text-foreground p-2 rounded-lg overflow-x-auto my-2 border border-border">
                       <code>{children}</code>
                     </pre>
                   );
                 }
                 return (
-                  <code className="bg-gray-700 text-gray-100 px-1 py-0.5 rounded text-sm">
+                  <code className="bg-secondary text-foreground px-1 py-0.5 rounded text-sm">
                     {children}
                   </code>
                 );
@@ -67,7 +67,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ sender, text, image, images, 
                   href={props.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-teal-400 hover:underline hover:text-teal-300"
+                  className="text-primary hover:underline"
                 >
                   {props.children}
                 </a>
@@ -85,7 +85,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ sender, text, image, images, 
               onClick={() => onPlay(text)}
               className={`listen-button text-xs uppercase font-semibold tracking-wider p-1 rounded transition-colors flex items-center gap-1 ${isPlaying
                   ? "text-red-400 hover:text-red-300 hover:bg-white/5"
-                  : "text-gray-400 hover:text-teal-400 hover:bg-white/5"
+                  : "text-muted-foreground hover:text-primary hover:bg-white/5"
                 }`}
               title={isPlaying ? "Stop" : "Listen"}
             >

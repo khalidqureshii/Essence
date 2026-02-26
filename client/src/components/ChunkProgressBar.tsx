@@ -21,14 +21,14 @@ const ChunkProgressBar: React.FC<ChunkProgressBarProps> = ({
               key={i}
               className={`w-5 h-5 rounded-md border-2 transition-all duration-700 shadow-sm ${
                 isCompleted
-                  ? "bg-gradient-to-br from-emerald-400 to-teal-500 border-teal-300 shadow-[0_0_12px_rgba(16,185,129,0.5)] scale-110"
-                  : "bg-gray-800 border-gray-700 hover:border-gray-500"
+                  ? "bg-primary border-primary shadow-[0_0_12px_rgba(16,185,129,0.5)] scale-110"
+                  : "bg-card border-border hover:border-border"
               }`}
             />
           );
         })}
       </div>
-      <span className="text-[11px] text-emerald-400 font-bold uppercase tracking-widest">
+      <span className="text-[11px] text-primary font-bold uppercase tracking-widest">
         UNITS COMPLETE: {Math.min(completedChunks, totalChunks)} / {totalChunks}
       </span>
     </div>
