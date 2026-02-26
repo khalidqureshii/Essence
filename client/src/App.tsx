@@ -314,6 +314,7 @@ const App: React.FC = () => {
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const isStoppingRef = useRef(false); // NEW
+  const isCancellingRef = useRef(false);
 
 
   const screenStreamRef = useRef<MediaStream | null>(null);
@@ -555,6 +556,7 @@ const App: React.FC = () => {
   const startRecording = async () => {
     try {
       if (isRecording) return;
+      isCancellingRef.current = false;
       setCurrentDraft("");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -565,13 +567,13 @@ const App: React.FC = () => {
 
         // Send audio chunk
         const socket = wsRef.current;
-        if (socket && socket.readyState === WebSocket.OPEN && !speakingText) {
+        if (socket && socket.readyState === WebSocket.OPEN && !speakingText && !isCancellingRef.current) {
           socket.send(event.data);
           // debug logging
           event.data.arrayBuffer().then(buf =>
             console.log("Sent chunk bytes:", buf.byteLength)
           );
-        } else {
+        } else if (!isCancellingRef.current) {
           console.warn("Cannot send audio chunk: ws not open");
         }
 
@@ -580,21 +582,23 @@ const App: React.FC = () => {
         if (isStoppingRef.current) {
           isStoppingRef.current = false;
 
-          // Optional small delay to give the server socket loop time to append bytes
-          setTimeout(() => {
-            const currentSocket = wsRef.current;
-            if (currentSocket && currentSocket.readyState === WebSocket.OPEN) {
-              console.log("🔔 Sending commit to backend after final chunk");
-              // 1️⃣ Send queued screenshots FIRST
-              flushPendingImages();
+          if (!isCancellingRef.current) {
+            // Optional small delay to give the server socket loop time to append bytes
+            setTimeout(() => {
+              const currentSocket = wsRef.current;
+              if (currentSocket && currentSocket.readyState === WebSocket.OPEN) {
+                console.log("🔔 Sending commit to backend after final chunk");
+                // 1️⃣ Send queued screenshots FIRST
+                flushPendingImages();
 
-              // 2️⃣ Then commit audio
-              currentSocket.send(JSON.stringify({ type: "commit" }));
+                // 2️⃣ Then commit audio
+                currentSocket.send(JSON.stringify({ type: "commit" }));
 
-            } else {
-              console.warn("Commit aborted: ws not open");
-            }
-          }, 120); // 100–300ms is fine; small to be safe
+              } else {
+                console.warn("Commit aborted: ws not open");
+              }
+            }, 120); // 100–300ms is fine; small to be safe
+          }
         }
       };
 
@@ -626,6 +630,7 @@ const App: React.FC = () => {
 
 
   const cancelRecording = () => {
+    isCancellingRef.current = true;
     stopRecording();
     if (wsRef.current) wsRef.current.send(JSON.stringify({ type: "reset" }));
     setStatus("INACTIVE");
