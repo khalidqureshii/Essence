@@ -161,7 +161,7 @@ export default function Home({ onBack, report }: ProjectReportProps) {
 
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen w-full bg-background text-foreground">
       <Header overallScore={report.report.overall_score} onBack={onBack} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

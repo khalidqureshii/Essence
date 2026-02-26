@@ -37,7 +37,7 @@ export default function EvaluationMetrics({ metrics }: EvaluationMetricsProps) {
             <h2 className="text-3xl font-bold text-foreground mb-2">Technical Evaluation</h2>
             <p className="text-muted-foreground">Detailed assessment across 13 key dimensions</p>
           </div>
-          <div className="flex gap-2">
+          <div className="no-print flex gap-2">
             <button
               onClick={() => setViewMode('grid')}
               className={`px-4 py-2 rounded-lg transition-colors ${viewMode === 'grid'

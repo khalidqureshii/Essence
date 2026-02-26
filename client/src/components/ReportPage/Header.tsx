@@ -22,7 +22,7 @@ export default function Header({ overallScore, onBack }: HeaderProps) {
           <div className="flex items-center gap-4">
             <button
               onClick={onBack}
-              className="p-2 rounded-full hover:bg-muted/20 transition-colors"
+              className="no-print p-2 rounded-full hover:bg-muted/20 transition-colors"
               title="Back to Chat"
             >
               <ArrowLeft className="w-6 h-6 text-muted-foreground hover:text-foreground" />
@@ -34,7 +34,7 @@ export default function Header({ overallScore, onBack }: HeaderProps) {
           </div>
           <button
             onClick={() => window.print()}
-            className="flex items-center gap-2 px-4 py-2 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors font-medium shadow-lg shadow-accent/20"
+            className="no-print flex items-center gap-2 px-4 py-2 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors font-medium shadow-lg shadow-accent/20"
             style={{ backgroundColor: '#00d9ff', color: '#0f1e2f', border: 'none' }}
           >
             <Download className="w-5 h-5" />

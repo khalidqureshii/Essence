@@ -1166,8 +1166,8 @@ const App: React.FC = () => {
       <Toaster position="top-center" toastOptions={{
         style: { background: '#333', color: '#fff' }
       }} />
-      
-      <Navbar 
+
+      <Navbar
         status={status}
         isRecording={isRecording}
         autoplayResponses={autoplayResponses}
