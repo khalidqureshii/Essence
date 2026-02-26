@@ -54,10 +54,10 @@ class TurnManager:
     async def process_audio_chunk(self, audio_bytes: bytes) -> AsyncGenerator[dict, None]:
         """
         Process incoming audio chunks.
-        Accumulates audio for the turn and re-transcribes the growing buffer
-        to ensure valid WebM headers and full context.
+        Accumulates audio for the turn and re-transcribes the growing buffer.
+        Only processes if the turn is already active (manual mic click).
         """
-        if self.is_responding:
+        if self.is_responding or not self.context.active:
             return
 
         self.turn_audio.extend(audio_bytes)
@@ -161,16 +161,8 @@ class TurnManager:
         # Debug Log
         self.logger.info(f"ACTIVE={self.context.active} TEXT={text}")
 
-        lower_text = text.lower()
-        
-        # 1. Wake ID / Start
-        # Ensure turn is active if we hear wake word OR if we have audio input (Implicit)
-        if "essence" in lower_text:
-            self.start_turn()
-        
-        elif source == "audio" and not self.context.active:
-            # Preferred fix: Auto-start turn on speech since mic is explicit
-            self.start_turn()
+        if self.is_responding:
+            return
 
         # 2. Screenshot keywords (DISABLED as per user request - only manual click allowed)
         # screenshot_triggers = [
@@ -183,26 +175,11 @@ class TurnManager:
         #          self.triggered_commands["screenshot"] = True
         #          yield {"type": "command", "payload": "capture_screenshot"}
         
-        # 3. Commit keywords (Only if active or explicitly typed?)
-        commit_triggers = ["over", "your turn"]
-        should_commit = any(trigger in lower_text for trigger in commit_triggers)
+        # 3. Commit keywords - DISABLED for manual mode
+        should_commit = False
 
         # 4. Context Update
-        # Clean the text if it contains commit triggers to avoid trailing "over" etc.
         cleaned_text = text
-        if should_commit:
-            for trigger in commit_triggers:
-                if trigger in lower_text:
-                    # Find the case-insensitive index to preserve original case if possible, 
-                    # but usually, we just want to remove the trigger word.
-                    # A robust way is to use regex or find/replace on the lower version 
-                    # but apply to original.
-                    start_idx = lower_text.find(trigger)
-                    if start_idx != -1:
-                        cleaned_text = text[:start_idx].strip()
-                        # Remove trailing punctuation often added by STT
-                        cleaned_text = cleaned_text.rstrip(".,?!")
-                        break
 
         if source == "text":
             self.start_turn() # Typed text always starts/is part of turn
@@ -213,6 +190,7 @@ class TurnManager:
             self.context.sources["text"] = True
             
         elif source == "audio":
+             self.start_turn() # Ensure turn is active if audio input is received
              if self.context.active:
                 self.context.transcript = cleaned_text
                 self.context.sources["audio"] = True

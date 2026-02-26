@@ -3,9 +3,6 @@ import ChatMessage from "./components/ChatMessage";
 import MessageInput from "./components/MessageInput";
 import Loader from "./components/Loader";
 import { Toaster, toast } from "react-hot-toast";
-import SpeechRecognition, {
-  useSpeechRecognition
-} from "react-speech-recognition";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import ProjectReport from "./Pages/ProjectReport";
@@ -248,7 +245,7 @@ const App: React.FC = () => {
     {
       id: "init-1",
       sender: "bot",
-      text: "Hi, I am Essence - your Agentic Critic. Say 'Essence' or click Mic to start.",
+      text: "Hi, I am Essence - your Agentic Critic. Click Mic to start.",
       isFinal: true,
     },
   ]);
@@ -462,6 +459,9 @@ const App: React.FC = () => {
             case "commit_confirmation":
               // Fallback: If backend sends no image, use the one we just sent (optimistic persistence)
               // READ REF OUTSIDE UPDATER (Safety fix for Strict Mode / Double Render)
+              // Clear waiting-for-transcript state if it was active
+              pendingCommitRef.current = false;
+
               const fallbackImages = lastSentImageRef.current;
               // Clear immediately as it's consumed
               lastSentImageRef.current = []; // cleared in handleCommit already but safe to ensure
@@ -539,56 +539,6 @@ const App: React.FC = () => {
   }, []);
 
 
-  //New Audio Recording code
-
-  const {
-    transcript,
-    resetTranscript
-  } = useSpeechRecognition();
-
-  useEffect(() => {
-    if (!SpeechRecognition.browserSupportsSpeechRecognition()) {
-      console.error("STT not supported");
-      return;
-    }
-
-    SpeechRecognition.startListening({
-      continuous: true,
-      language: "en-US"
-    });
-
-    return () => {
-      SpeechRecognition.stopListening();
-    };
-  }, []);
-
-  useEffect(() => {
-    const text = transcript.toLowerCase().trim();
-    if (!text) return;
-
-    console.log("🎧 Transcript Update:", text);
-
-    // START: "essence"
-    if (
-      /\bessence\b/.test(text) &&
-      !isRecording
-    ) {
-      startRecording();
-      resetTranscript(); // important to avoid repeat trigger
-    }
-
-    // STOP: "over"
-    if (
-      /\bover\b/.test(text) &&
-      isRecording
-    ) {
-      stopRecording();
-      setTimeout(() => {
-        handleCommit();
-        resetTranscript();
-      }, 1200); // 🔑 allow audio flush
-    }
-  }, [transcript]);
 
   const startRecording = async () => {
     try {
@@ -985,11 +935,12 @@ const App: React.FC = () => {
       // 1. Flush Images
       flushPendingImages();
 
-      // 2. Clear Draft
+      // Clear draft locally as it will be yielded back by commit_confirmation
       setCurrentDraft("");
     }
 
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      console.log("🚀 Sending commit to backend");
       wsRef.current.send(JSON.stringify({ type: "commit" }));
     }
   };
@@ -1259,7 +1210,7 @@ const App: React.FC = () => {
           disabled={status === "RESPONDING"}
         />
         <div className="text-xs text-gray-500 text-center mt-2">
-          Say "Essence" to start • "Over" to send
+          Click Mic to start and stop recording
         </div>
       </footer>
     </div>

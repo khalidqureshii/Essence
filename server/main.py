@@ -105,8 +105,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     elif event_type == "reset":
                          turn_manager.context.reset()
                          orchestrator.reset_conversation()
-                         turn_manager.turn_audio.clear()
                          turn_manager.triggered_commands = {"screenshot": False}
+                         audio_buffer.clear()
                          await websocket.send_json({"type": "state_update", "payload": turn_manager.get_context_snapshot()})
 
                     # Send updated context state/transcript back if needed (or TurnManager yields it?)
@@ -121,6 +121,7 @@ async def websocket_endpoint(websocket: WebSocket):
             if "bytes" in message:
                 audio_data = message["bytes"]
                 audio_buffer.extend(audio_data)
+                turn_manager.start_turn()
             # if "bytes" in message:
             #     audio_data = message["bytes"]
             #     # Process audio chunk
