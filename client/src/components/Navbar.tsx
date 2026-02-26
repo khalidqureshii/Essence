@@ -25,12 +25,6 @@ const Navbar: React.FC<NavbarProps> = ({
     >
       <div className="w-[150px] flex-shrink-0 flex items-center space-x-2">
         <h1 className="text-2xl font-bold text-teal-400 font-mono tracking-tighter">Essence</h1>
-        <div className="flex flex-col items-start translate-y-1">
-           <p className="text-[10px] uppercase tracking-widest font-bold"
-            style={{ color: status === "ACTIVE" ? "#34d399" : status === "RESPONDING" ? "#60a5fa" : "#9ca3af" }}>
-            {status}
-          </p>
-        </div>
       </div>
 
       <div className="flex-1 flex justify-center px-4">
