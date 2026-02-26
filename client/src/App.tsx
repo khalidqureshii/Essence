@@ -1163,6 +1163,8 @@ const App: React.FC = () => {
         isRecording={isRecording}
         autoplayResponses={autoplayResponses}
         onToggleAutoplay={toggleAutoplay}
+        onGenerateReport={generateReport}
+        onExportPDF={exportChatToPDF}
         macroCompletedChunks={evaluationState.completedSections}
         sectionLabel={currentSectionLabel}
         sectionProgress={evaluationState.sectionProgress}

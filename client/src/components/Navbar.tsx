@@ -5,6 +5,8 @@ interface NavbarProps {
   isRecording: boolean;
   autoplayResponses: boolean;
   onToggleAutoplay: () => void;
+  onGenerateReport: () => void;
+  onExportPDF: () => void;
   macroCompletedChunks: number;
   sectionLabel: string;
   sectionProgress: number;
@@ -15,6 +17,8 @@ const Navbar: React.FC<NavbarProps> = ({
   isRecording,
   autoplayResponses,
   onToggleAutoplay,
+  onGenerateReport,
+  onExportPDF,
   macroCompletedChunks,
   sectionLabel,
   sectionProgress
@@ -103,7 +107,23 @@ const Navbar: React.FC<NavbarProps> = ({
             <span className="text-[10px] text-red-500 font-black tracking-widest uppercase">Live</span>
           </div>
         ) : (
-          <div className="flex items-center">
+          <div className="flex items-center space-x-4">
+            {/* Debug Actions */}
+            <button
+              onClick={onGenerateReport}
+              className="text-[10px] px-3.5 py-1.5 rounded-lg bg-teal-600/10 hover:bg-teal-600 border border-teal-500/20 text-teal-400 hover:text-white font-bold uppercase tracking-widest transition-all shadow-sm active:scale-95"
+            >
+              Report
+            </button>
+            <button
+              onClick={onExportPDF}
+              className="text-[10px] px-3.5 py-1.5 rounded-lg bg-gray-800/80 hover:bg-gray-700 border border-gray-700/50 text-gray-400 hover:text-white font-bold uppercase tracking-widest transition-all shadow-sm active:scale-95"
+            >
+              PDF
+            </button>
+
+            <div className="h-8 w-[1px] bg-gray-800 mx-1" />
+
             {/* Premium Autoplay Toggle */}
             <div className="flex flex-col items-center space-y-1">
                 <button 
