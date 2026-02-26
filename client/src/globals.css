@@ -119,7 +119,84 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@media print {
+  @page {
+    margin: 1cm;
+  }
+
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: unset !important;
+    background: #0f1e2f !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Remove min-h-screen so the container doesn't force blank extra pages */
+  .min-h-screen {
+    min-height: unset !important;
+    height: auto !important;
+  }
+
+  /* Hide UI-only elements that shouldn't appear in print */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Fix overflow only on layout containers — NOT on line-clamp or progress bar elements.
+     The previous overflow: visible !important on * was breaking line-clamp
+     (which depends on overflow: hidden), causing card layouts to collapse */
+  html,
+  body,
+  main,
+  section,
+  article {
+    overflow: visible !important;
+  }
+
+  /* Show full text (remove clamp limit) for print */
+  .line-clamp-2 {
+    -webkit-line-clamp: unset !important;
+    line-clamp: unset !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  .line-clamp-3 {
+    -webkit-line-clamp: unset !important;
+    line-clamp: unset !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  /* Allow natural page breaks only between major sections, not within cards */
+  main>section {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+
+  /* Prevent cards from being split across pages */
+  [class*="rounded-xl"],
+  [class*="rounded-2xl"],
+  [class*="rounded-lg"] {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Prevent orphaned headers */
+  h1,
+  h2,
+  h3 {
+    page-break-after: avoid;
+    break-after: avoid;
   }
 }
