@@ -34,7 +34,7 @@ const Navbar: React.FC<NavbarProps> = ({
     >
       {/* Left: Brand */}
       <div className="w-[180px] flex-shrink-0 flex items-center justify-start">
-        <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 into-emerald-400 tracking-tighter filter drop-shadow-[0_0_10px_rgba(20,184,166,0.3)]">
+        <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400 tracking-tighter filter drop-shadow-[0_0_10px_rgba(20,184,166,0.3)]">
           Essence
         </h1>
       </div>

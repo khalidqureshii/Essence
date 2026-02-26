@@ -741,17 +741,8 @@ const App: React.FC = () => {
       // Normal (not recording) behavior
       setPendingImage([base64Image]);
 
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          type: "image_input",
-          image: base64Image,
-          source: "shared"
-        }));
-
-        if (autoSend) {
-          wsRef.current.send(JSON.stringify({ type: "commit" }));
-          setPendingImage([]);
-        }
+      if (autoSend) {
+        handleCommit();
       }
     } catch (e) {
       console.error("Screenshot error:", e);
@@ -775,11 +766,6 @@ const App: React.FC = () => {
             const imgStr = event.target.result as string;
             console.log("Paste Image Data:", imgStr.substring(0, 50) + "...", imgStr.length);
             setPendingImage(prev => [...prev, imgStr]); // Update UI preview
-            wsRef.current.send(JSON.stringify({
-              type: "image_input",
-              image: imgStr,
-              source: "pasted"
-            }));
           } else {
             console.warn("WS not ready or paste failed");
           }
