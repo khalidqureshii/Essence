@@ -7,8 +7,7 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import ProjectReport from "./Pages/ProjectReport";
 import Navbar from "./components/Navbar";
-import SectionIndicator from "./components/SectionIndicator";
-import SectionProgressBar from "./components/SectionProgressBar";
+import CompletionDashboard from "./components/CompletionDashboard";
 
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://essence-gf00.onrender.com";
@@ -53,10 +52,9 @@ interface EvaluationState {
 }
 
 type AnswerQuality = "strong" | "partial" | "weak";
-type EvaluationAction = {
-  type: "ANSWER_EVALUATED";
-  payload: { text: string };
-};
+type EvaluationAction = 
+  | { type: "ANSWER_EVALUATED"; payload: { text: string } }
+  | { type: "RESET_EVALUATION" };
 
 const SECTION_COMPLETION_THRESHOLD = 0.75;
 
@@ -235,6 +233,14 @@ const evaluationReducer = (state: EvaluationState, action: EvaluationAction): Ev
 
       return nextState;
     }
+    case "RESET_EVALUATION":
+      return {
+        currentSectionIndex: 0,
+        currentSection: EVALUATION_SECTIONS[0].key,
+        sectionConfidence: 0,
+        sectionProgress: 0,
+        completedSections: 0
+      };
     default:
       return state;
   }
@@ -272,6 +278,8 @@ const App: React.FC = () => {
     sectionProgress: 0,
     completedSections: 0
   });
+
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
 
   const MAX_REPORT_GENERATIONS = 1
 
@@ -901,6 +909,33 @@ const App: React.FC = () => {
     });
   };
 
+  const resetSession = () => {
+    setMessages([
+      {
+        id: "init-" + Date.now(),
+        sender: "bot",
+        text: "Session reset. I am Essence - your Agentic Critic. Click Mic to start.",
+        isFinal: true,
+      },
+    ]);
+    dispatchEvaluation({ type: "RESET_EVALUATION" });
+    setCurrentDraft("");
+    setPendingImage([]);
+    setReport(null);
+    setReportGenerationCount(0);
+    setShowCompletionModal(false);
+    lastAutoplayMessageIdRef.current = null;
+    toast.success("Session reset successfully");
+  };
+
+  useEffect(() => {
+    if (evaluationState.completedSections === EVALUATION_SECTIONS.length && !showCompletionModal) {
+      // Small delay for better UX
+      const timer = setTimeout(() => setShowCompletionModal(true), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [evaluationState.completedSections]);
+
   const handleCommit = () => {
     // Also filter hallucinations at commit time just in case
     const lower = currentDraft.trim().toLowerCase();
@@ -1137,12 +1172,18 @@ const App: React.FC = () => {
         isRecording={isRecording}
         autoplayResponses={autoplayResponses}
         onToggleAutoplay={toggleAutoplay}
-        onGenerateReport={generateReport}
-        onExportPDF={exportChatToPDF}
         macroCompletedChunks={evaluationState.completedSections}
         sectionLabel={currentSectionLabel}
         sectionProgress={evaluationState.sectionProgress}
       />
+
+      {showCompletionModal && (
+        <CompletionDashboard 
+          onGenerateReport={generateReport}
+          onDownloadPDF={exportChatToPDF}
+          onReset={resetSession}
+        />
+      )}
 
       {/* Chat Area (scrollable only here) */}
       <main id="chat-export" className="flex-1 overflow-y-auto px-4 md:px-16 py-6 space-y-4 scrollbar-hide relative">

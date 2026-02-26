@@ -6,8 +6,6 @@ interface NavbarProps {
   isRecording: boolean;
   autoplayResponses: boolean;
   onToggleAutoplay: () => void;
-  onGenerateReport: () => void;
-  onExportPDF: () => void;
   macroCompletedChunks: number;
   sectionLabel: string;
   sectionProgress: number;
@@ -18,8 +16,6 @@ const Navbar: React.FC<NavbarProps> = ({
   isRecording,
   autoplayResponses,
   onToggleAutoplay,
-  onGenerateReport,
-  onExportPDF,
   macroCompletedChunks,
   sectionLabel,
   sectionProgress
@@ -98,20 +94,6 @@ const Navbar: React.FC<NavbarProps> = ({
                     Auto-play
                 </span>
             </div>
-
-            <div className="h-10 w-[1px] bg-gray-700/50" />
-            <button
-              onClick={onGenerateReport}
-              className="text-[11px] px-5 py-2.5 rounded-xl bg-teal-600/10 hover:bg-teal-600 border border-teal-500/30 text-teal-300 hover:text-white font-bold uppercase tracking-widest transition-all shadow-md active:scale-95"
-            >
-              Report
-            </button>
-            <button
-              onClick={onExportPDF}
-              className="text-[11px] px-5 py-2.5 rounded-xl bg-gray-800/80 hover:bg-gray-700 border border-gray-600/50 text-gray-300 hover:text-white font-bold uppercase tracking-widest transition-all shadow-md active:scale-95"
-            >
-              PDF
-            </button>
           </div>
         )}
       </div>
