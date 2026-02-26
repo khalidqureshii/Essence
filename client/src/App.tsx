@@ -53,7 +53,7 @@ interface EvaluationState {
 }
 
 type AnswerQuality = "strong" | "partial" | "weak";
-type EvaluationAction = 
+type EvaluationAction =
   | { type: "ANSWER_EVALUATED"; payload: { text: string } }
   | { type: "RESET_EVALUATION" };
 
@@ -1169,7 +1169,7 @@ const App: React.FC = () => {
       />
 
       {showCompletionModal && (
-        <CompletionDashboard 
+        <CompletionDashboard
           onGenerateReport={generateReport}
           onDownloadPDF={exportChatToPDF}
           onReset={resetSession}
