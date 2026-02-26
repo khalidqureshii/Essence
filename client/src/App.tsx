@@ -1140,12 +1140,9 @@ const App: React.FC = () => {
         onGenerateReport={generateReport}
         onExportPDF={exportChatToPDF}
         macroCompletedChunks={evaluationState.completedSections}
+        sectionLabel={currentSectionLabel}
+        sectionProgress={evaluationState.sectionProgress}
       />
-
-      <SectionIndicator section={currentSectionLabel} />
-      <div className="h-16 flex items-center justify-center px-4 bg-gray-900/40 border-b border-gray-800/50 backdrop-blur-sm">
-        <SectionProgressBar progress={evaluationState.sectionProgress} />
-      </div>
 
       {/* Chat Area (scrollable only here) */}
       <main id="chat-export" className="flex-1 overflow-y-auto px-4 md:px-16 py-6 space-y-4 scrollbar-hide relative">
