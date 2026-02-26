@@ -1,5 +1,4 @@
 import React from "react";
-import ChunkProgressBar from "./ChunkProgressBar";
 
 interface NavbarProps {
   status: "INACTIVE" | "ACTIVE" | "RESPONDING";
@@ -20,77 +19,100 @@ const Navbar: React.FC<NavbarProps> = ({
   sectionLabel,
   sectionProgress
 }) => {
-  const verdanaStyle = { fontFamily: "'Verdana', sans-serif" };
+  // Clean modern sans-serif stack
+  const sansStyle = { fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif" };
 
+  const totalNodes = 6;
+  
   return (
     <header 
-      className="h-28 px-6 text-center border-b border-gray-700 shadow-xl flex-shrink-0 flex justify-between items-center transition-all duration-500 overflow-hidden bg-gray-900/80 backdrop-blur-md"
+      className="h-28 px-6 text-center border-b border-gray-700 shadow-xl flex-shrink-0 flex justify-between items-center bg-gray-900/90 backdrop-blur-xl relative z-50"
       style={{ 
         borderColor: status === "ACTIVE" ? "#14b8a6" : status === "RESPONDING" ? "#3b82f6" : "#374151",
-        ...verdanaStyle
+        ...sansStyle
       }}
     >
       {/* Left: Brand */}
-      <div className="w-[200px] flex-shrink-0 flex items-center">
-        <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400 tracking-tighter filter drop-shadow-[0_0_10px_rgba(20,184,166,0.2)]">
+      <div className="w-[180px] flex-shrink-0 flex items-center justify-start">
+        <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 into-emerald-400 tracking-tighter filter drop-shadow-[0_0_10px_rgba(20,184,166,0.3)]">
           Essence
         </h1>
       </div>
 
-      {/* Center: Consolidated Horizontal Progress */}
-      <div className="flex-1 flex flex-row items-center justify-center space-x-12 px-12">
+      {/* Center: Minimal Connector-Only Progress */}
+      <div className="flex-1 flex flex-col items-center justify-center space-y-4 px-4 max-w-3xl mx-auto">
         
-        {/* Left Part: Macro Progress */}
-        <div className="flex flex-col items-center justify-center space-y-2 py-2">
-            <div className="transform scale-110">
-                <ChunkProgressBar completedChunks={macroCompletedChunks} />
-            </div>
+        {/* Node & Connector Row */}
+        <div className="flex items-center justify-between w-full relative h-10">
+          {Array.from({ length: totalNodes }).map((_, i) => {
+            const isCompleted = i < macroCompletedChunks;
+            const isActive = i === macroCompletedChunks;
+            
+            return (
+              <React.Fragment key={i}>
+                {/* Numbered Node */}
+                <div className="relative">
+                  <div 
+                    className={`
+                      w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-500 z-10 relative
+                      ${isCompleted ? "bg-teal-500 text-white shadow-[0_0_12px_rgba(20,184,166,0.5)]" : 
+                        isActive ? "border-2 border-teal-400 text-teal-400 shadow-[0_0_15px_rgba(20,184,166,0.3)]" : 
+                        "border-2 border-gray-800 text-gray-700"}
+                    `}
+                  >
+                    {i + 1}
+                    {/* Active Subtle Glow */}
+                    {isActive && (
+                      <div className="absolute inset-0 rounded-full bg-teal-400/15 blur-md -z-10" />
+                    )}
+                  </div>
+                </div>
+
+                {/* Connector Bar (The Only Progress Bar) */}
+                {i < totalNodes - 1 && (
+                  <div className="flex-1 h-[3px] bg-gray-800 mx-1 rounded-full overflow-hidden relative">
+                    <div 
+                      className="absolute inset-y-0 left-0 bg-gradient-to-r from-teal-500 to-teal-400 transition-all duration-700 ease-out"
+                      style={{ 
+                        width: `${i < macroCompletedChunks ? 100 : (i === macroCompletedChunks ? sectionProgress : 0)}%` 
+                      }}
+                    />
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          })}
         </div>
 
-        {/* Vertical Divider */}
-        <div className="h-14 w-[1px] bg-gray-700/50" />
-
-        {/* Right Part: Micro Progress & Phase */}
-        <div className="flex flex-col items-center justify-center space-y-3 min-w-[320px]">
-            <div className="flex items-center space-x-2.5">
-                <div className={`w-2 h-2 rounded-full animate-pulse shadow-[0_0_10px] ${status === "RESPONDING" ? "bg-blue-400 shadow-blue-400/50" : "bg-teal-500 shadow-teal-500/50"}`} />
-                <span className="text-[12px] font-bold uppercase tracking-[0.2em] text-gray-300">
-                    Phase: <span className="text-teal-400 ml-1.5">{sectionLabel}</span>
-                </span>
-            </div>
-            
-            <div className="w-full bg-gray-800/80 rounded-full h-2 overflow-hidden border border-gray-600/50 shadow-inner px-[0.5px]">
-                <div
-                    className="bg-gradient-to-r from-teal-500 to-emerald-400 h-full transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(20,184,166,0.4)]"
-                    style={{ width: `${Math.min(Math.max(sectionProgress, 0), 100)}%` }}
-                />
-            </div>
-            <div className="flex justify-center w-full">
-                <span className="text-[11px] text-teal-500/80 font-bold uppercase tracking-widest">
-                    {Math.round(sectionProgress)}% DONE
-                </span>
-            </div>
+        {/* Phase Label - Refined Hierarchy */}
+        <div className="h-6 flex items-center justify-center space-x-2 transition-all duration-500 animate-in fade-in slide-in-from-top-1">
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] opacity-80">
+                PHASE
+            </span>
+            <span className="text-[13px] font-extrabold text-teal-400 uppercase tracking-wide">
+                {sectionLabel}
+            </span>
         </div>
       </div>
 
       {/* Right: Controls */}
-      <div className="w-[300px] flex-shrink-0 flex justify-end">
+      <div className="w-[180px] flex-shrink-0 flex justify-end items-center">
         {isRecording ? (
-          <div className="flex items-center space-x-3 bg-red-500/10 px-6 py-3 rounded-xl border border-red-500/30 animate-pulse">
-            <div className="w-3 h-3 bg-red-500 rounded-full shadow-[0_0_12px_rgba(239,68,68,0.9)]"></div>
-            <span className="text-[13px] text-red-500 font-bold tracking-[0.2em]">RECORDING</span>
+          <div className="flex items-center space-x-2.5 bg-red-500/10 px-4 py-2 rounded-xl border border-red-500/20 animate-pulse">
+            <div className="w-2 h-2 bg-red-500 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.8)]"></div>
+            <span className="text-[10px] text-red-500 font-black tracking-widest uppercase">Live</span>
           </div>
         ) : (
-          <div className="flex items-center space-x-5">
+          <div className="flex items-center">
             {/* Premium Autoplay Toggle */}
-            <div className="flex flex-col items-center space-y-1.5">
+            <div className="flex flex-col items-center space-y-1">
                 <button 
                   onClick={onToggleAutoplay}
-                  className={`relative w-11 h-6 transition-colors duration-300 rounded-full border border-gray-600/50 focus:outline-none focus:ring-2 focus:ring-teal-500/20 ${autoplayResponses ? "bg-teal-600/80" : "bg-gray-800"}`}
+                  className={`relative w-9 h-5 transition-colors duration-300 rounded-full border border-gray-700/50 focus:outline-none focus:ring-2 focus:ring-teal-500/20 ${autoplayResponses ? "bg-teal-600" : "bg-gray-800"}`}
                 >
-                    <div className={`absolute top-0.5 left-0.5 w-[1.125rem] h-[1.125rem] bg-white rounded-full transition-transform duration-300 shadow-md ${autoplayResponses ? "translate-x-5" : "translate-x-0"}`} />
+                    <div className={`absolute top-0.5 left-0.5 w-[0.9rem] h-[0.9rem] bg-white rounded-full transition-transform duration-300 shadow-sm ${autoplayResponses ? "translate-x-4" : "translate-x-0"}`} />
                 </button>
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest select-none">
+                <span className="text-[8px] text-gray-600 font-black uppercase tracking-widest leading-none">
                     Auto-play
                 </span>
             </div>

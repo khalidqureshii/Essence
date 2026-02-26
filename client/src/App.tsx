@@ -38,7 +38,8 @@ const EVALUATION_SECTIONS = [
   { key: "UI_UX", label: "UI & User Experience" },
   { key: "DESIGN_DECISIONS", label: "Design Decisions & Trade-offs" },
   { key: "TECHNICAL_AWARENESS", label: "Technical Awareness" },
-  { key: "LIMITATIONS_IMPROVEMENTS", label: "Limitations & Improvements" }
+  { key: "LIMITATIONS_IMPROVEMENTS", label: "Limitations & Improvements" },
+  { key: "RESULTS", label: "Results / Report" }
 ] as const;
 
 type EvaluationSectionKey = typeof EVALUATION_SECTIONS[number]["key"];
@@ -188,6 +189,9 @@ const getConfidenceIncrement = (quality: AnswerQuality, score: number) => {
 const evaluationReducer = (state: EvaluationState, action: EvaluationAction): EvaluationState => {
   switch (action.type) {
     case "ANSWER_EVALUATED": {
+      // Prevent evaluation if we're already in RESULTS section
+      if (state.currentSection === "RESULTS") return state;
+
       const { quality, score } = analyzeAnswer(action.payload.text);
       const increment = getConfidenceIncrement(quality, score);
 
@@ -929,12 +933,13 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    if (evaluationState.completedSections === EVALUATION_SECTIONS.length && !showCompletionModal) {
-      // Small delay for better UX
-      const timer = setTimeout(() => setShowCompletionModal(true), 1500);
-      return () => clearTimeout(timer);
+    if (evaluationState.currentSection === "RESULTS" && !showCompletionModal && view !== "report") {
+      // Immediately switch to report view or show modal
+      setShowCompletionModal(true);
+      // Small delay before switching view to let user see the final state
+      setTimeout(() => setView("report"), 2000);
     }
-  }, [evaluationState.completedSections]);
+  }, [evaluationState.currentSection]);
 
   const handleCommit = () => {
     // Also filter hallucinations at commit time just in case
