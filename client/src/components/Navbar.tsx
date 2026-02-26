@@ -30,15 +30,15 @@ const Navbar: React.FC<NavbarProps> = ({
   
   return (
     <header 
-      className="h-28 px-6 text-center border-b border-gray-700 shadow-xl flex-shrink-0 flex justify-between items-center bg-gray-900/90 backdrop-blur-xl relative z-50"
+      className="h-28 px-6 text-center border-b border-border shadow-xl flex-shrink-0 flex justify-between items-center bg-background/90 backdrop-blur-xl relative z-50"
       style={{ 
-        borderColor: status === "ACTIVE" ? "#14b8a6" : status === "RESPONDING" ? "#3b82f6" : "#374151",
+        borderColor: status === "ACTIVE" ? "var(--primary)" : status === "RESPONDING" ? "var(--accent)" : "var(--border)",
         ...sansStyle
       }}
     >
       {/* Left: Brand */}
-      <div className="w-[180px] flex-shrink-0 flex items-center justify-start">
-        <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400 tracking-tighter filter drop-shadow-[0_0_10px_rgba(20,184,166,0.3)]">
+      <div className="w-[180px] flex-shrink-0 flex items-center justify-start ml-10">
+        <h1 className="text-3xl font-black text-primary tracking-tighter filter drop-shadow-[0_0_10px_rgba(20,184,166,0.3)]">
           Essence
         </h1>
       </div>
@@ -59,24 +59,24 @@ const Navbar: React.FC<NavbarProps> = ({
                   <div 
                     className={`
                       w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-500 z-10 relative
-                      ${isCompleted ? "bg-teal-500 text-white shadow-[0_0_12px_rgba(20,184,166,0.5)]" : 
-                        isActive ? "border-2 border-teal-400 text-teal-400 shadow-[0_0_15px_rgba(20,184,166,0.3)]" : 
-                        "border-2 border-gray-800 text-gray-700"}
+                      ${isCompleted ? "bg-primary text-primary-foreground shadow-[0_0_12px_rgba(20,184,166,0.5)]" : 
+                        isActive ? "border-2 border-primary text-primary shadow-[0_0_15px_rgba(20,184,166,0.3)]" : 
+                        "border-2 border-border text-muted-foreground"}
                     `}
                   >
                     {i + 1}
                     {/* Active Subtle Glow */}
                     {isActive && (
-                      <div className="absolute inset-0 rounded-full bg-teal-400/15 blur-md -z-10" />
+                      <div className="absolute inset-0 rounded-full bg-primary/15 blur-md -z-10" />
                     )}
                   </div>
                 </div>
 
                 {/* Connector Bar (The Only Progress Bar) */}
                 {i < totalNodes - 1 && (
-                  <div className="flex-1 h-[3px] bg-gray-800 mx-1 rounded-full overflow-hidden relative">
+                  <div className="flex-1 h-[3px] bg-secondary mx-1 rounded-full overflow-hidden relative">
                     <div 
-                      className="absolute inset-y-0 left-0 bg-gradient-to-r from-teal-500 to-teal-400 transition-all duration-700 ease-out"
+                      className="absolute inset-y-0 left-0 bg-primary transition-all duration-700 ease-out"
                       style={{ 
                         width: `${i < macroCompletedChunks ? 100 : (i === macroCompletedChunks ? sectionProgress : 0)}%` 
                       }}
@@ -90,10 +90,10 @@ const Navbar: React.FC<NavbarProps> = ({
 
         {/* Phase Label - Refined Hierarchy */}
         <div className="h-6 flex items-center justify-center space-x-2 transition-all duration-500 animate-in fade-in slide-in-from-top-1">
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] opacity-80">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] opacity-80">
                 PHASE
             </span>
-            <span className="text-[13px] font-extrabold text-teal-400 uppercase tracking-wide">
+            <span className="text-[13px] font-extrabold text-primary uppercase tracking-wide">
                 {sectionLabel}
             </span>
         </div>
@@ -111,28 +111,28 @@ const Navbar: React.FC<NavbarProps> = ({
             {/* Debug Actions */}
             <button
               onClick={onGenerateReport}
-              className="text-[10px] px-3.5 py-1.5 rounded-lg bg-teal-600/10 hover:bg-teal-600 border border-teal-500/20 text-teal-400 hover:text-white font-bold uppercase tracking-widest transition-all shadow-sm active:scale-95"
+              className="text-[10px] px-3.5 py-1.5 rounded-lg bg-primary/10 hover:bg-primary border border-primary/20 text-primary hover:text-primary-foreground font-bold uppercase tracking-widest transition-all shadow-sm active:scale-95"
             >
               Report
             </button>
             <button
               onClick={onExportPDF}
-              className="text-[10px] px-3.5 py-1.5 rounded-lg bg-gray-800/80 hover:bg-gray-700 border border-gray-700/50 text-gray-400 hover:text-white font-bold uppercase tracking-widest transition-all shadow-sm active:scale-95"
+              className="text-[10px] px-3.5 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary border border-border text-muted-foreground hover:text-foreground font-bold uppercase tracking-widest transition-all shadow-sm active:scale-95"
             >
               PDF
             </button>
 
-            <div className="h-8 w-[1px] bg-gray-800 mx-1" />
+            <div className="h-8 w-[1px] bg-border mx-1" />
 
             {/* Premium Autoplay Toggle */}
             <div className="flex flex-col items-center space-y-1">
                 <button 
                   onClick={onToggleAutoplay}
-                  className={`relative w-9 h-5 transition-colors duration-300 rounded-full border border-gray-700/50 focus:outline-none focus:ring-2 focus:ring-teal-500/20 ${autoplayResponses ? "bg-teal-600" : "bg-gray-800"}`}
+                  className={`relative w-9 h-5 transition-colors duration-300 rounded-full border border-border focus:outline-none focus:ring-2 focus:ring-ring/20 ${autoplayResponses ? "bg-primary" : "bg-secondary"}`}
                 >
                     <div className={`absolute top-0.5 left-0.5 w-[0.9rem] h-[0.9rem] bg-white rounded-full transition-transform duration-300 shadow-sm ${autoplayResponses ? "translate-x-4" : "translate-x-0"}`} />
                 </button>
-                <span className="text-[8px] text-gray-600 font-black uppercase tracking-widest leading-none">
+                <span className="text-[8px] text-muted-foreground font-black uppercase tracking-widest leading-none">
                     Auto-play
                 </span>
             </div>

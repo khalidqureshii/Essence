@@ -17,14 +17,14 @@ const MacroProgress: React.FC<MacroProgressProps> = ({ completedChunks }) => {
               key={i}
               className={`w-4 h-4 rounded-sm border transition-all duration-500 shadow-sm ${
                 isCompleted 
-                  ? "bg-emerald-500 border-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.4)]" 
-                  : "bg-gray-800 border-gray-700"
+                  ? "bg-primary border-primary shadow-[0_0_8px_rgba(16,185,129,0.4)]" 
+                  : "bg-card border-border"
               }`}
             />
           );
         })}
       </div>
-      <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-tighter">
+      <span className="text-[10px] font-mono text-primary font-bold uppercase tracking-tighter">
         Overall Evaluation: {completedChunks}/{totalChunks} Units
       </span>
     </div>

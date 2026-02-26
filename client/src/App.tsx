@@ -1131,7 +1131,7 @@ const App: React.FC = () => {
 
   if (!isBackendConnected) {
     return (
-      <div className="h-screen w-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white overflow-hidden justify-center items-center">
+      <div className="h-screen w-screen flex flex-col bg-background text-foreground overflow-hidden justify-center items-center">
         <Loader />
       </div>
     );
@@ -1147,7 +1147,7 @@ const App: React.FC = () => {
 
   return (
     <div
-      className="h-screen w-screen flex flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white overflow-hidden"
+      className="h-screen w-screen flex flex-col bg-background text-foreground overflow-hidden"
       onPaste={handlePaste} // Global paste listener for simplicity
     >
       <Toaster position="top-center" toastOptions={{
@@ -1204,9 +1204,9 @@ const App: React.FC = () => {
                       src={img}
                       alt={`Pending Context ${idx + 1}`}
                       onError={(e) => console.error("Image load error", e)}
-                      className="w-24 h-auto rounded-lg border-2 border-teal-500/50 shadow-lg object-cover bg-gray-900"
+                      className="w-24 h-auto rounded-lg border-2 border-border shadow-lg object-cover bg-background"
                     />
-                    <div className="absolute -top-2 -right-2 bg-teal-500 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full z-10">
+                    <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full z-10">
                       IMG
                     </div>
                   </div>
@@ -1214,16 +1214,16 @@ const App: React.FC = () => {
               </div>
             )}
             {status === "ACTIVE" && pendingImage.length === 0 && (
-              <div className="bg-gray-800/90 border border-teal-500/50 p-3 rounded-lg backdrop-blur-sm shadow-xl flex items-center space-x-3">
-                <div className="w-2 h-2 bg-teal-500 rounded-full animate-pulse" />
-                <span className="text-xs text-teal-200 font-medium">Turn Active</span>
+              <div className="bg-card/90 border border-border p-3 rounded-lg backdrop-blur-sm shadow-xl flex items-center space-x-3">
+                <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                <span className="text-xs text-primary font-medium">Turn Active</span>
               </div>
             )}
           </div>
         )}
       </main>
 
-      <footer className="p-4 border-t border-gray-700 bg-gray-900 flex-shrink-0">
+      <footer className="p-4 border-t border-border bg-background flex-shrink-0">
         <MessageInput
           onSend={() => {
             if (isRecording) finishRecording();
@@ -1240,7 +1240,7 @@ const App: React.FC = () => {
           isSharing={isSharing}
           disabled={status === "RESPONDING"}
         />
-        <div className="text-xs text-gray-500 text-center mt-2">
+        <div className="text-xs text-muted-foreground text-center mt-2">
           Click Mic to start and stop recording
         </div>
       </footer>

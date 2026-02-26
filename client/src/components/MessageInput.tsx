@@ -94,11 +94,11 @@ const MessageInput: React.FC<MessageInputProps> = ({
   };
 
   const renderPiPContent = () => (
-    <div className='bg-gray-900 h-full w-full flex items-center justify-center space-x-2'>
+    <div className='bg-background h-full w-full flex items-center justify-center space-x-2'>
       {/* Camera Button */}
       <button
         onClick={onCameraClick}
-        className="bg-teal-500 hover:bg-teal-400 p-2 rounded-full text-white shadow-lg transform active:scale-95 transition-all"
+        className="bg-primary hover:bg-secondary p-2 rounded-full text-primary-foreground shadow-lg transform active:scale-95 transition-all"
         title="Take Screenshot"
       >
         <Camera size={20} />
@@ -109,7 +109,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
         <>
           <button
             onClick={onCancelRecording}
-            className="p-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-red-400 rounded-full transition-colors"
+            className="p-2 bg-secondary hover:bg-card text-muted-foreground hover:text-red-400 rounded-full transition-colors"
             title="Cancel"
           >
             <span className="font-bold text-lg leading-none">✕</span>
@@ -125,7 +125,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
       ) : (
         <button
           onClick={onMicClick}
-          className="bg-gray-700 hover:bg-gray-600 p-2 rounded-full text-white shadow-lg transition-all"
+          className="bg-secondary hover:bg-card p-2 rounded-full text-foreground shadow-lg transition-all"
           title="Start Recording"
         >
           <Mic size={20} />
@@ -139,12 +139,12 @@ const MessageInput: React.FC<MessageInputProps> = ({
       {/* PiP Portal */}
       {pipWindow && createPortal(renderPiPContent(), pipWindow.document.body)}
 
-      <div className={`flex items-center bg-gray-800 rounded-lg shadow-lg px-4 py-2 space-x-3 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
+      <div className={`flex items-center bg-card border border-border rounded-lg shadow-lg px-4 py-2 space-x-3 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
 
         {/* Share Button (replaces PiP toggle) */}
         <button
           onClick={onShareClick}
-          className={`transition ${isSharing ? 'text-blue-400 animate-pulse' : 'text-gray-400 hover:text-white'}`}
+          className={`transition ${isSharing ? 'text-blue-400 animate-pulse' : 'text-muted-foreground hover:text-foreground'}`}
           title={isSharing ? "Stop Sharing" : "Share Screen"}
         >
           <Monitor size={20} />
@@ -161,32 +161,32 @@ const MessageInput: React.FC<MessageInputProps> = ({
             }
           }}
           placeholder={isRecording ? "Listening..." : "Type your message..."}
-          className="flex-1 resize-none bg-transparent text-gray-100 placeholder-gray-500 focus:outline-none"
+          className="flex-1 resize-none bg-transparent text-foreground placeholder-muted-foreground focus:outline-none"
         />
 
         {isRecording ? (
           <div className="flex items-center space-x-2">
             <button
-              onClick={onCancelRecording}
-              className="p-2 text-gray-400 hover:text-red-400 transition-colors"
-              title="Cancel Recording"
-            >
-              <div className="relative w-6 h-6 flex items-center justify-center bg-gray-700 rounded-full">
-                <span className="text-xs font-bold">✕</span>
-              </div>
-            </button>
+               onClick={onCancelRecording}
+               className="p-2 text-muted-foreground hover:text-red-400 transition-colors"
+               title="Cancel Recording"
+             >
+               <div className="relative w-6 h-6 flex items-center justify-center bg-secondary rounded-full">
+                 <span className="text-xs font-bold">✕</span>
+               </div>
+             </button>
             <button
               onClick={onSend}
               className="p-2 text-white bg-red-600 hover:bg-red-500 rounded-full shadow-lg shadow-red-500/30 animate-pulse transition-all"
               title="Stop & Send"
             >
-              <Square size={18} fill="currentColor" />
+              <Square size={24} fill="currentColor" />
             </button>
           </div>
         ) : (
           <button
             onClick={onMicClick}
-            className="text-gray-400 hover:text-white transition-colors p-2"
+            className="text-muted-foreground hover:text-foreground transition-colors p-2"
             title="Start Recording"
           >
             <Mic size={22} />
@@ -196,7 +196,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
         <button
           onClick={handleSend}
           disabled={disabled}
-          className="bg-teal-500 hover:bg-teal-600 text-white p-2 rounded-full transition disabled:bg-gray-600"
+          className="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-full transition disabled:bg-secondary"
         >
           <Send size={20} />
         </button>
