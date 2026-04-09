@@ -108,31 +108,35 @@ const Navbar: React.FC<NavbarProps> = ({
             {/* Debug Actions */}
             <button
               onClick={onGenerateReport}
-              className="app-btn app-btn-primary"
+              className="app-btn app-btn-primary h-11"
             >
               Report
             </button>
             <button
               onClick={onExportPDF}
-              className="app-btn app-btn-secondary"
+              className="app-btn app-btn-primary h-11"
             >
               PDF
             </button>
 
             <div className="h-8 w-[1px] bg-border mx-1" />
 
-            {/* Premium Autoplay Toggle */}
-            <div className="flex items-center space-x-2 ml-4">
-                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-0.5">
-                    Auto-play
-                </span>
-                <button 
-                  onClick={onToggleAutoplay}
-                  className={`relative w-9 h-5 transition-colors duration-300 rounded-full border border-border focus:outline-none focus:ring-2 focus:ring-ring/20 ${autoplayResponses ? "bg-[#10b981] border-[#34d399]" : "bg-[#374151] border-[#4b5563]"}`}
-                >
-                    <div className={`absolute top-0.5 left-0.5 w-[0.9rem] h-[0.9rem] bg-white rounded-full transition-transform duration-300 shadow-sm ${autoplayResponses ? "translate-x-4" : "translate-x-0"}`} />
-                </button>
-            </div>
+            {/* Premium Autoplay Pill Badge */}
+            <button
+              onClick={onToggleAutoplay}
+              className={`app-btn ml-2 transition-all duration-300 w-auto whitespace-nowrap flex items-center gap-3 px-5 h-11 ${
+                autoplayResponses 
+                  ? "app-btn-primary border-transparent" 
+                  : "bg-secondary text-muted-foreground border-transparent hover:bg-secondary/80 focus:ring-secondary/20"
+              }`}
+            >
+              <span>AUTOPLAY</span>
+              <span className={`text-[10px] leading-none px-2 py-1 rounded-[4px] font-black tracking-wider ${
+                autoplayResponses ? "bg-white/20 text-white" : "bg-black/30 text-muted-foreground"
+              }`}>
+                {autoplayResponses ? "ON" : "OFF"}
+              </span>
+            </button>
           </div>
         )}
       </div>
