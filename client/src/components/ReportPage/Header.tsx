@@ -34,8 +34,7 @@ export default function Header({ overallScore, onBack }: HeaderProps) {
           </div>
           <button
             onClick={() => window.print()}
-            className="no-print flex items-center gap-2 px-4 py-2 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors font-medium shadow-lg shadow-accent/20"
-            style={{ backgroundColor: '#00d9ff', color: '#0f1e2f', border: 'none' }}
+            className="app-btn app-btn-primary no-print"
           >
             <Download className="w-5 h-5" />
             Download PDF

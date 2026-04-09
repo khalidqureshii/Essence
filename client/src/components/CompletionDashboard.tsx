@@ -38,14 +38,14 @@ const CompletionDashboard: React.FC<CompletionDashboardProps> = ({
         <div className="flex flex-col space-y-4">
           <button
             onClick={onGenerateReport}
-            className="w-full py-4 px-6 bg-primary hover:bg-secondary text-primary-foreground font-black rounded-2xl transition-all transform hover:scale-[1.02] active:scale-95 shadow-lg shadow-teal-900/20 tracking-widest text-sm uppercase"
+            className="app-btn app-btn-primary w-full"
           >
             Generate Detailed Report
           </button>
           
           <button
             onClick={onDownloadPDF}
-            className="w-full py-4 px-6 bg-card hover:bg-secondary text-foreground font-black rounded-2xl transition-all border border-border transform hover:scale-[1.02] active:scale-95 tracking-widest text-sm uppercase"
+            className="app-btn app-btn-secondary w-full"
           >
             Download Chat History PDF
           </button>
@@ -53,7 +53,7 @@ const CompletionDashboard: React.FC<CompletionDashboardProps> = ({
           <div className="pt-6">
             <button
               onClick={onReset}
-              className="text-muted-foreground hover:text-primary font-bold transition-colors text-xs uppercase tracking-[0.2em]"
+              className="app-btn app-btn-ghost w-full"
             >
               Start New Session
             </button>
