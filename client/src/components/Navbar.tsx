@@ -58,7 +58,7 @@ const Navbar: React.FC<NavbarProps> = ({
                 <div className="relative">
                   <div 
                     className={`
-                      w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-500 z-10 relative
+                      w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold transition-all duration-500 z-10 relative
                       ${isCompleted ? "bg-primary text-primary-foreground shadow-[0_0_12px_rgba(20,184,166,0.5)]" : 
                         isActive ? "border-2 border-primary text-primary shadow-[0_0_15px_rgba(20,184,166,0.3)]" : 
                         "border-2 border-border text-muted-foreground"}
