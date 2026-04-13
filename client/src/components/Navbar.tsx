@@ -11,7 +11,7 @@ interface NavbarProps {
   sectionLabel: string;
   sectionProgress: number;
 }
-
+// Navbar for navigation
 const Navbar: React.FC<NavbarProps> = ({
   status,
   isRecording,
@@ -27,11 +27,11 @@ const Navbar: React.FC<NavbarProps> = ({
   const sansStyle = { fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif" };
 
   const totalNodes = 6;
-  
+
   return (
-    <header 
+    <header
       className="h-28 px-6 text-center border-b border-border shadow-xl flex-shrink-0 flex justify-between items-center bg-background/90 backdrop-blur-xl relative z-50"
-      style={{ 
+      style={{
         borderColor: status === "ACTIVE" ? "var(--primary)" : status === "RESPONDING" ? "var(--accent)" : "var(--border)",
         ...sansStyle
       }}
@@ -45,23 +45,23 @@ const Navbar: React.FC<NavbarProps> = ({
 
       {/* Center: Minimal Connector-Only Progress */}
       <div className="flex-1 flex flex-col items-center justify-center space-y-4 px-4 max-w-3xl mx-auto">
-        
+
         {/* Node & Connector Row */}
         <div className="flex items-center justify-between w-full relative h-10">
           {Array.from({ length: totalNodes }).map((_, i) => {
             const isCompleted = i < macroCompletedChunks;
             const isActive = i === macroCompletedChunks;
-            
+
             return (
               <React.Fragment key={i}>
                 {/* Numbered Node */}
                 <div className="relative">
-                  <div 
+                  <div
                     className={`
                       w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold transition-all duration-500 z-10 relative
-                      ${isCompleted ? "bg-primary text-primary-foreground shadow-[0_0_12px_rgba(20,184,166,0.5)]" : 
-                        isActive ? "border-2 border-primary text-primary shadow-[0_0_15px_rgba(20,184,166,0.3)]" : 
-                        "border-2 border-border text-muted-foreground"}
+                      ${isCompleted ? "bg-primary text-primary-foreground shadow-[0_0_12px_rgba(20,184,166,0.5)]" :
+                        isActive ? "border-2 border-primary text-primary shadow-[0_0_15px_rgba(20,184,166,0.3)]" :
+                          "border-2 border-border text-muted-foreground"}
                     `}
                   >
                     {i + 1}
@@ -75,10 +75,10 @@ const Navbar: React.FC<NavbarProps> = ({
                 {/* Connector Bar (The Only Progress Bar) */}
                 {i < totalNodes - 1 && (
                   <div className="flex-1 h-[3px] bg-secondary mx-1 rounded-full overflow-hidden relative">
-                    <div 
+                    <div
                       className="absolute inset-y-0 left-0 bg-primary transition-all duration-700 ease-out"
-                      style={{ 
-                        width: `${i < macroCompletedChunks ? 100 : (i === macroCompletedChunks ? sectionProgress : 0)}%` 
+                      style={{
+                        width: `${i < macroCompletedChunks ? 100 : (i === macroCompletedChunks ? sectionProgress : 0)}%`
                       }}
                     />
                   </div>
@@ -90,9 +90,9 @@ const Navbar: React.FC<NavbarProps> = ({
 
         {/* Phase Label - Refined Hierarchy */}
         <div className="h-6 flex items-center justify-center space-x-2 transition-all duration-500 animate-in fade-in slide-in-from-top-1">
-            <span className="text-[25px] font-extrabold text-primary uppercase tracking-wide">
-                PHASE: {sectionLabel}
-            </span>
+          <span className="text-[25px] font-extrabold text-primary uppercase tracking-wide">
+            PHASE: {sectionLabel}
+          </span>
         </div>
       </div>
 
@@ -124,16 +124,14 @@ const Navbar: React.FC<NavbarProps> = ({
             {/* Premium Autoplay Pill Badge */}
             <button
               onClick={onToggleAutoplay}
-              className={`app-btn ml-2 transition-all duration-300 w-auto whitespace-nowrap flex items-center gap-3 px-5 h-11 ${
-                autoplayResponses 
-                  ? "app-btn-primary border-transparent" 
-                  : "bg-secondary text-muted-foreground border-transparent hover:bg-secondary/80 focus:ring-secondary/20"
-              }`}
+              className={`app-btn ml-2 transition-all duration-300 w-auto whitespace-nowrap flex items-center gap-3 px-5 h-11 ${autoplayResponses
+                ? "app-btn-primary border-transparent"
+                : "bg-secondary text-muted-foreground border-transparent hover:bg-secondary/80 focus:ring-secondary/20"
+                }`}
             >
               <span>AUTOPLAY</span>
-              <span className={`text-[10px] leading-none px-2 py-1 rounded-[4px] font-black tracking-wider ${
-                autoplayResponses ? "bg-white/20 text-white" : "bg-black/30 text-muted-foreground"
-              }`}>
+              <span className={`text-[10px] leading-none px-2 py-1 rounded-[4px] font-black tracking-wider ${autoplayResponses ? "bg-white/20 text-white" : "bg-black/30 text-muted-foreground"
+                }`}>
                 {autoplayResponses ? "ON" : "OFF"}
               </span>
             </button>
