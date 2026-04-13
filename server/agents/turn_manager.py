@@ -38,7 +38,8 @@ class TurnManager:
         self.triggered_commands = {"screenshot": False}
 
     def get_context_snapshot(self):
-        progress_data = self.orchestrator.conversation_manager.get_progress_data()
+        manager = self.orchestrator.resume_manager if getattr(self.orchestrator, "current_mode", "project") == "resume" else self.orchestrator.conversation_manager
+        progress_data = manager.get_progress_data()
         return {
             "active": self.context.active,
             "transcript": self.context.transcript,

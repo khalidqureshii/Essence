@@ -1,8 +1,11 @@
 from langchain_groq import ChatGroq
+from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import JsonOutputParser
 from typing import AsyncIterable, List, Dict, Optional
 import json
+import os
+from config import Config
 
 class ThinkingAgent:
     def __init__(self, api_key: str, model_name: str):
@@ -11,8 +14,14 @@ class ThinkingAgent:
             model_name=model_name,
             streaming=True
         )
+        self.resume_llm = ChatOpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=Config.OPENROUTER_API_KEY or "sk-dummy",
+            model="openai/gpt-oss-120b",
+            streaming=True
+        ) if Config.OPENROUTER_API_KEY else self.llm
 
-    async def stream_critique(self, transcript: str, image_data: Optional[str] = None, memory_context: str = "", history: List[Dict] = [], custom_system_prompt: Optional[str] = None) -> AsyncIterable[str]:
+    async def stream_critique(self, transcript: str, image_data: Optional[str] = None, memory_context: str = "", history: List[Dict] = [], custom_system_prompt: Optional[str] = None, mode: str = "project") -> AsyncIterable[str]:
         # Default prompt if no custom logic provided
         base_system_prompt = (
             "You are an Agentic Critique System. Your task is to analyze user input and optional UI screenshots.\n"
@@ -50,6 +59,8 @@ class ThinkingAgent:
 
         messages.append(HumanMessage(content=content))
 
-        async for chunk in self.llm.astream(messages):
+        active_llm = self.resume_llm if mode == "resume" else self.llm
+
+        async for chunk in active_llm.astream(messages):
             if chunk.content:
                 yield chunk.content

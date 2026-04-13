@@ -11,6 +11,7 @@ import CompletionDashboard from "./components/CompletionDashboard";
 
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://essence-gf00.onrender.com";
+const LOCAL_API_BASE_URL = import.meta.env.VITE_LOCAL_API_BASE_URL || "http://localhost:8000";
 
 interface Message {
   id: string;
@@ -31,7 +32,8 @@ declare global {
 }
 
 // Derive WS URL from API_BASE_URL (http -> ws, https -> wss)
-const WS_URL = API_BASE_URL.replace(/^http/, "ws") + "/chatbot/ws";
+const PROD_WS_URL = API_BASE_URL.replace(/^http/, "ws") + "/chatbot/ws";
+const WS_URL = import.meta.env.VITE_LOCAL_WS_URL || PROD_WS_URL;
 
 const EVALUATION_SECTIONS = [
   { key: "PROJECT_UNDERSTANDING", label: "Project Understanding" },
@@ -259,7 +261,13 @@ const App: React.FC = () => {
       isFinal: true,
     },
   ]);
+  const [appMode, setAppMode] = useState<"project" | "resume">("project");
+  const [resumeParsedText, setResumeParsedText] = useState("");
+  const [interviewTimeLimit, setInterviewTimeLimit] = useState<number>(15);
+  const [interviewFocus, setInterviewFocus] = useState<string>("general");
+  const [isUploading, setIsUploading] = useState(false);
   const [status, setStatus] = useState<"INACTIVE" | "ACTIVE" | "RESPONDING">("INACTIVE");
+  const [serverProgressData, setServerProgressData] = useState<{macro_completed_chunks: number, micro_section_progress: number, section: string} | null>(null);
   const [view, setView] = useState<"chat" | "report">("chat");
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -396,11 +404,11 @@ const App: React.FC = () => {
 
           switch (data.type) {
             case "state_update":
-              if (data.payload.is_responding) {
+              if (data.payload === "RESPONDING" || data.payload?.is_responding) {
                 setStatus("RESPONDING");
               } else {
-                if (data.payload.active) setStatus("ACTIVE");
-                else setStatus("INACTIVE");
+                if (data.payload === "ACTIVE" || data.payload?.active) setStatus("ACTIVE");
+                else if (data.payload === "INACTIVE" || data.payload?.active === false) setStatus("INACTIVE");
 
                 // Mark last bot message as final when responding stops
                 setMessages(prev => {
@@ -409,6 +417,14 @@ const App: React.FC = () => {
                     return [...prev.slice(0, -1), { ...last, isFinal: true }];
                   }
                   return prev;
+                });
+              }
+              
+              if (typeof data.payload === "object" && data.payload?.section) {
+                setServerProgressData({
+                  macro_completed_chunks: data.payload.macro_completed_chunks,
+                  micro_section_progress: data.payload.micro_section_progress,
+                  section: data.payload.section
                 });
               }
               break;
@@ -905,14 +921,30 @@ const App: React.FC = () => {
   };
 
   const resetSession = () => {
+    const txt = appMode === "project" 
+        ? "Session reset. I am Essence - your Agentic Critic. Please share your project details."
+        : "Session reset. I am Essence - your Agentic Critic. Please upload your resume.";
+    
     setMessages([
       {
         id: "init-" + Date.now(),
         sender: "bot",
-        text: "Session reset. I am Essence - your Agentic Critic. Click Mic to start.",
+        text: txt,
         isFinal: true,
       },
     ]);
+    
+    // Backend Reset Notification
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+       wsRef.current.send(JSON.stringify({
+          type: "reset",
+          mode: appMode,
+          resume_text: resumeParsedText,
+          focus_mode: interviewFocus,
+          time_limit: interviewTimeLimit
+       }));
+    }
+
     dispatchEvaluation({ type: "RESET_EVALUATION" });
     setCurrentDraft("");
     setPendingImage([]);
@@ -921,6 +953,62 @@ const App: React.FC = () => {
     setShowCompletionModal(false);
     lastAutoplayMessageIdRef.current = null;
     toast.success("Session reset successfully");
+  };
+
+  useEffect(() => {
+    // Automatically reset session when switching modes
+    resetSession();
+  }, [appMode]);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith(".pdf")) {
+      toast.error("Please upload a PDF file.");
+      return;
+    }
+
+    setIsUploading(true);
+    const toastId = toast.loading("Processing Resume...");
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await fetch(`${LOCAL_API_BASE_URL}/api/upload_resume`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to process PDF");
+      }
+
+      const data = await response.json();
+      if (data.parsed_text && data.parsed_text.trim().length > 50) {
+        setResumeParsedText(data.parsed_text);
+        toast.success("Resume processed successfully! Starting interview...", { id: toastId });
+        
+        // Let backend know the resume context was loaded
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+           wsRef.current.send(JSON.stringify({
+              type: "reset",
+              mode: appMode,
+              resume_text: data.parsed_text,
+              focus_mode: interviewFocus,
+              time_limit: interviewTimeLimit
+           }));
+        }
+      } else {
+        toast.error("Extracted text too small. Vision fallback not enabled.", { id: toastId });
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error connecting to server.", { id: toastId });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   useEffect(() => {
@@ -1147,8 +1235,17 @@ const App: React.FC = () => {
   }
 
   const currentSectionLabel =
-    EVALUATION_SECTIONS.find(section => section.key === evaluationState.currentSection)?.label
-    ?? EVALUATION_SECTIONS[0].label;
+    appMode === "resume" && serverProgressData
+      ? serverProgressData.section
+      : EVALUATION_SECTIONS.find(section => section.key === evaluationState.currentSection)?.label ?? EVALUATION_SECTIONS[0].label;
+
+  const currentMacroChunks = appMode === "resume" && serverProgressData
+      ? serverProgressData.macro_completed_chunks
+      : evaluationState.completedSections;
+
+  const currentSectionProgress = appMode === "resume" && serverProgressData
+      ? serverProgressData.micro_section_progress
+      : evaluationState.sectionProgress;
 
   return (
     <div
@@ -1159,9 +1256,6 @@ const App: React.FC = () => {
         style: { background: '#333', color: '#fff' }
       }} />
       {/* Header */}
-      <Toaster position="top-center" toastOptions={{
-        style: { background: '#333', color: '#fff' }
-      }} />
 
       <Navbar
         status={status}
@@ -1170,9 +1264,9 @@ const App: React.FC = () => {
         onToggleAutoplay={toggleAutoplay}
         onGenerateReport={generateReport}
         onExportPDF={exportChatToPDF}
-        macroCompletedChunks={evaluationState.completedSections}
+        macroCompletedChunks={currentMacroChunks}
         sectionLabel={currentSectionLabel}
-        sectionProgress={evaluationState.sectionProgress}
+        sectionProgress={currentSectionProgress}
       />
 
       {showCompletionModal && (
@@ -1185,6 +1279,70 @@ const App: React.FC = () => {
 
       {/* Chat Area (scrollable only here) */}
       <main id="chat-export" className="flex-1 overflow-y-auto px-4 md:px-16 py-6 space-y-4 scrollbar-hide relative">
+        {messages.length === 1 && (
+          <div className="flex flex-col items-center justify-center space-y-6 mt-10">
+            <div className="bg-secondary/50 p-1.5 rounded-full flex border border-border">
+              <button
+                onClick={() => setAppMode("project")}
+                className={`px-6 py-2 rounded-full font-bold text-sm transition-all ${appMode === "project" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:text-white"}`}
+              >
+                Project Mode
+              </button>
+              <button
+                onClick={() => setAppMode("resume")}
+                className={`px-6 py-2 rounded-full font-bold text-sm transition-all ${appMode === "resume" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:text-white"}`}
+              >
+                Resume Mode
+              </button>
+            </div>
+            
+            {appMode === "resume" && (
+              <div className="w-full max-w-md bg-card/80 p-6 rounded-2xl border border-border flex flex-col space-y-4">
+                <h3 className="text-lg font-bold text-center">Resume Settings</h3>
+                
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium">Interview Focus</label>
+                  <select 
+                    value={interviewFocus}
+                    onChange={(e) => setInterviewFocus(e.target.value)}
+                    className="p-2 rounded-md bg-background border border-border"
+                  >
+                    <option value="general">General</option>
+                    <option value="skills">Technical Skills</option>
+                    <option value="projects">Projects Focus</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium">Time Limit</label>
+                  <select 
+                    value={interviewTimeLimit}
+                    onChange={(e) => setInterviewTimeLimit(Number(e.target.value))}
+                    className="p-2 rounded-md bg-background border border-border"
+                  >
+                    <option value={5}>5 Minutes</option>
+                    <option value={15}>15 Minutes</option>
+                    <option value={60}>60 Minutes</option>
+                  </select>
+                </div>
+                
+                <div className="pt-2">
+                   {!resumeParsedText ? (
+                      <label className="app-btn w-full flex justify-center items-center py-2 bg-primary cursor-pointer">
+                        {isUploading ? "Processing..." : "Select Resume (PDF)"}
+                        <input type="file" accept=".pdf" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
+                      </label>
+                   ) : (
+                      <div className="p-3 bg-primary/20 border border-primary/40 rounded-lg text-center text-sm font-medium">
+                        Resume Loaded ✓. Interview is starting!
+                      </div>
+                   )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {messages.map((msg, i) => (
           <ChatMessage
             key={i}

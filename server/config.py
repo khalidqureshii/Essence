@@ -19,4 +19,7 @@ class Config:
     GEMINI_API_KEY = os.getenv("CHATBOT_API_KEY")
     REPORT_MODEL = "gemini-2.5-flash"
 
+    # OpenRouter
+    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
     DEBUG = True

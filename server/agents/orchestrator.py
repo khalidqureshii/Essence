@@ -6,20 +6,30 @@ class AgentOrchestrator:
     def __init__(self, groq_api_key: str, thinking_model: str, memory_model: str):
         from agents.memory_agent import MemoryAgent
         from agents.conversation_manager import ConversationManager
+        from agents.resume_manager import ResumeConversationManager
         
         self.thinking_agent = ThinkingAgent(groq_api_key, thinking_model)
         self.memory_agent = MemoryAgent(groq_api_key, memory_model)
         self.conversation_manager = ConversationManager()
+        self.resume_manager = ResumeConversationManager()
+        self.current_mode = "project"
 
+    def set_mode(self, mode: str, resume_text: str = "", focus_mode: str = "general", time_limit_mins: int = 15):
+        self.current_mode = mode
+        if mode == "resume":
+            self.resume_manager.setup_interview(resume_text, focus_mode, time_limit_mins)
+            
     async def run_flow(self, transcript: str, image_data: List[str] = None):
+        manager = self.resume_manager if self.current_mode == "resume" else self.conversation_manager
+        
         # 1. Get State-Specific Instructions
-        system_prompt = self.conversation_manager.get_state_instruction(
+        system_prompt = manager.get_state_instruction(
             transcript, 
             has_image=(image_data and len(image_data) > 0)
         )
         
         # 2. Get History
-        history = self.conversation_manager.history
+        history = manager.history
         
         # 3. Get Memory
         memory_context = self.memory_agent.get_context()
@@ -38,14 +48,15 @@ class AgentOrchestrator:
             primary_image, 
             memory_context, 
             history=history,
-            custom_system_prompt=system_prompt
+            custom_system_prompt=system_prompt,
+            mode=self.current_mode
         ):
             full_response += chunk
             yield chunk
 
         # 5. Update Conversation State & History (Main Thread)
-        self.conversation_manager.update_history(transcript, full_response)
-        self.conversation_manager.check_state_transition(transcript, full_response)
+        manager.update_history(transcript, full_response)
+        manager.check_state_transition(transcript, full_response)
         
         # 6. Parallel fire-and-forget long-term memory update
         state_snapshot = {
@@ -58,3 +69,4 @@ class AgentOrchestrator:
 
     def reset_conversation(self):
         self.conversation_manager.reset()
+        self.resume_manager.reset()

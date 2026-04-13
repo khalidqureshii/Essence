@@ -9,6 +9,9 @@ from typing import List, Dict, Any
 import uvicorn
 import json
 import asyncio
+import io
+import PyPDF2
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException
 
 from config import Config
 from agents.stt_agent import stt_agent
@@ -103,11 +106,25 @@ async def websocket_endpoint(websocket: WebSocket):
 
                             
                     elif event_type == "reset":
+                         mode = payload.get("mode", "project")
+                         resume_text = payload.get("resume_text", "")
+                         focus_mode = payload.get("focus_mode", "general")
+                         time_limit = payload.get("time_limit", 15)
+                         
+                         orchestrator.set_mode(mode, resume_text, focus_mode, time_limit)
+                         
                          turn_manager.context.reset()
                          orchestrator.reset_conversation()
                          turn_manager.triggered_commands = {"screenshot": False}
                          audio_buffer.clear()
                          await websocket.send_json({"type": "state_update", "payload": turn_manager.get_context_snapshot()})
+                         
+                         if mode == "resume" and resume_text:
+                             # Silently start the AI response without showing a user bubble on the frontend
+                             turn_manager.context.active = True
+                             turn_manager.context.typed_text = "[System] Resume loaded. Please briefly introduce yourself and immediately ask the first interview question based on the resume."
+                             async for response in turn_manager.handle_commit():
+                                 await websocket.send_json(response)
 
                     # Send updated context state/transcript back if needed (or TurnManager yields it?)
                     # TurnManager methods above didn't yield for input updates, strictly speaking.
@@ -166,6 +183,30 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.get("/")
 def root():
     return {"message": "Essence Multi-Agent Critique API is running!"}
+
+@app.post("/api/upload_resume")
+async def upload_resume(file: UploadFile = File(...)):
+    print("File received")
+    if not file.filename.endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+        
+    try:
+        contents = await file.read()
+        pdf_reader = PyPDF2.PdfReader(io.BytesIO(contents))
+        extracted_text = ""
+        for page in pdf_reader.pages:
+            if page.extract_text():
+                extracted_text += page.extract_text() + "\n"
+                
+        # Basic fallback log if empty (in a full prod scenario we'd call Gemini Vision here)
+        if len(extracted_text.strip()) < 50:
+            logger.warning("PDF extraction yielded very little text. Likely image-based.")
+            # For this context, return what we have or a note
+            
+        return {"parsed_text": extracted_text}
+    except Exception as e:
+        logger.error(f"Error processing PDF: {e}")
+        raise HTTPException(status_code=500, detail="Failed to parse PDF.")
 
 class ReportRequest(BaseModel):
     chat_history: List[Dict[str, Any]]
