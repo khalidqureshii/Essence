@@ -109,7 +109,7 @@ const Navbar: React.FC<NavbarProps> = ({
               {isRightMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsRightMenuOpen(false)} />
-                  <div className="absolute top-[3.5rem] right-0 w-60 bg-background border border-border rounded-xl shadow-2xl p-4 flex flex-col items-center space-y-3 z-50 animate-in fade-in slide-in-from-top-2">
+                  <div className="absolute top-[3.5rem] right-0 w-[260px] bg-card border-2 border-secondary rounded-2xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.7)] p-4 flex flex-col items-center space-y-3 z-50 animate-in fade-in slide-in-from-top-2">
                     <button
                       onClick={() => { onGenerateReport(); setIsRightMenuOpen(false); }}
                       className="app-btn app-btn-primary h-11 w-full justify-center"
