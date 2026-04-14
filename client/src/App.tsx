@@ -9,6 +9,7 @@ import ProjectReport from "./Pages/ProjectReport";
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
 import CompletionDashboard from "./components/CompletionDashboard";
+import { X } from "lucide-react";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://essence-gf00.onrender.com";
 const LOCAL_API_BASE_URL = import.meta.env.VITE_LOCAL_API_BASE_URL || "http://localhost:8000";
@@ -1475,7 +1476,14 @@ const App: React.FC = () => {
                       onError={(e) => console.error("Image load error", e)}
                       className="w-24 h-auto rounded-lg border-2 border-border shadow-lg object-cover bg-background"
                     />
-                    <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full z-10">
+                    <button
+                      onClick={() => setPendingImage(prev => prev.filter((_, i) => i !== idx))}
+                      className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-md z-10 opacity-100 md:opacity-0 group-hover:opacity-100 transition-all hover:scale-110"
+                      title="Remove Image"
+                    >
+                      <X size={12} strokeWidth={3} />
+                    </button>
+                    <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full z-0 opacity-0 md:opacity-100 group-hover:opacity-0 transition-opacity pointer-events-none">
                       IMG
                     </div>
                   </div>
