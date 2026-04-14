@@ -78,9 +78,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                       w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold transition-all duration-500 z-10 relative
                       ${
                         isCompleted
-                          ? "bg-primary text-primary-foreground shadow-[0_0_16px_rgba(20,184,166,0.6)]"
+                          ? "bg-teal-500 text-white shadow-[0_0_16px_rgba(20,184,166,0.5)]"
                           : isActive
-                          ? "border-2 border-primary text-primary shadow-[0_0_20px_rgba(20,184,166,0.4)]"
+                          ? "border-2 border-teal-400 text-teal-400 shadow-[0_0_20px_rgba(45,212,191,0.4)]"
                           : "border-2 border-border text-muted-foreground bg-card"
                       }
                     `}
@@ -88,7 +88,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     {i + 1}
                     {/* Active Subtle Glow */}
                     {isActive && (
-                      <div className="absolute inset-0 rounded-full bg-primary/20 blur-md -z-10" />
+                      <div className="absolute inset-0 rounded-full bg-teal-400/20 blur-md -z-10" />
                     )}
                   </div>
 
@@ -96,7 +96,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   {i < totalNodes - 1 && (
                     <div className="w-[4px] h-12 bg-card my-1 rounded-full overflow-hidden relative shrink-0">
                       <div
-                        className="absolute inset-x-0 top-0 bg-primary transition-all duration-700 ease-out w-full"
+                        className="absolute inset-x-0 top-0 bg-teal-400 transition-all duration-700 ease-out w-full"
                         style={{
                           height: `${
                             isCompleted ? 100 : isActive ? sectionProgress : 0
@@ -118,7 +118,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   </span>
                   
                   {isActive && (
-                    <span className="text-xs text-primary font-bold uppercase tracking-widest mt-1 animate-pulse">
+                    <span className="text-xs text-teal-400 font-bold uppercase tracking-widest mt-1 animate-pulse">
                       In Progress
                     </span>
                   )}
