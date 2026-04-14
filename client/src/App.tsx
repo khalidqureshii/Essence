@@ -7,8 +7,8 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import ProjectReport from "./Pages/ProjectReport";
 import Navbar from "./components/Navbar";
+import Sidebar from "./components/Sidebar";
 import CompletionDashboard from "./components/CompletionDashboard";
-
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://essence-gf00.onrender.com";
 const LOCAL_API_BASE_URL = import.meta.env.VITE_LOCAL_API_BASE_URL || "http://localhost:8000";
@@ -293,6 +293,7 @@ const App: React.FC = () => {
   });
 
   const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const MAX_REPORT_GENERATIONS = 1
 
@@ -1420,6 +1421,15 @@ const App: React.FC = () => {
         sectionLabel={currentSectionLabel}
         sectionProgress={currentSectionProgress}
         isModeLocked={setupStep === "complete"}
+        onToggleSidebar={() => setIsSidebarOpen(true)}
+      />
+
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        macroCompletedChunks={serverProgressData ? serverProgressData.macro_completed_chunks : evaluationState.completedSections}
+        sectionLabel={currentSectionLabel}
+        sectionProgress={currentSectionProgress}
       />
 
       {showCompletionModal && (
