@@ -10,6 +10,7 @@ interface NavbarProps {
   macroCompletedChunks: number;
   sectionLabel: string;
   sectionProgress: number;
+  isModeLocked: boolean;
 }
 // Navbar for navigation
 const Navbar: React.FC<NavbarProps> = ({
@@ -21,7 +22,8 @@ const Navbar: React.FC<NavbarProps> = ({
   onExportPDF,
   macroCompletedChunks,
   sectionLabel,
-  sectionProgress
+  sectionProgress,
+  isModeLocked
 }) => {
   // Clean modern sans-serif stack
   const sansStyle = { fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif" };
@@ -122,19 +124,22 @@ const Navbar: React.FC<NavbarProps> = ({
             <div className="h-8 w-[1px] bg-border mx-1" />
 
             {/* Premium Autoplay Pill Badge */}
-            <button
-              onClick={onToggleAutoplay}
-              className={`app-btn ml-2 transition-all duration-300 w-auto whitespace-nowrap flex items-center gap-3 px-5 h-11 ${autoplayResponses
-                ? "app-btn-primary border-transparent"
-                : "bg-secondary text-muted-foreground border-transparent hover:bg-secondary/80 focus:ring-secondary/20"
-                }`}
-            >
-              <span>AUTOPLAY</span>
-              <span className={`text-[10px] leading-none px-2 py-1 rounded-[4px] font-black tracking-wider ${autoplayResponses ? "bg-white/20 text-white" : "bg-black/30 text-muted-foreground"
-                }`}>
-                {autoplayResponses ? "ON" : "OFF"}
-              </span>
-            </button>
+            <div className={`ml-2 ${!isModeLocked ? "cursor-not-allowed" : ""}`}>
+              <button
+                onClick={onToggleAutoplay}
+                disabled={!isModeLocked}
+                className={`app-btn transition-all duration-300 w-auto whitespace-nowrap flex items-center gap-3 px-5 h-11 ${!isModeLocked ? "opacity-50 pointer-events-none" : ""} ${autoplayResponses
+                  ? "app-btn-primary border-transparent"
+                  : "bg-secondary text-muted-foreground border-transparent hover:bg-secondary/80 focus:ring-secondary/20"
+                  }`}
+              >
+                <span>AUTOPLAY</span>
+                <span className={`text-[10px] leading-none px-2 py-1 rounded-[4px] font-black tracking-wider ${autoplayResponses ? "bg-white/20 text-white" : "bg-black/30 text-muted-foreground"
+                  }`}>
+                  {autoplayResponses ? "ON" : "OFF"}
+                </span>
+              </button>
+            </div>
           </div>
         )}
       </div>

@@ -8,9 +8,10 @@ interface ChatMessageProps {
   images?: string[];
   onPlay?: (text: string) => void;
   isPlaying?: boolean;
+  children?: React.ReactNode;
 }
 
-const ChatMessage: React.FC<ChatMessageProps> = ({ sender, text, image, images, onPlay, isPlaying }) => {
+const ChatMessage: React.FC<ChatMessageProps> = ({ sender, text, image, images, onPlay, isPlaying, children }) => {
   const isUser = sender === "user";
 
   return (
@@ -108,6 +109,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ sender, text, image, images, 
             </button>
           </div>
         )}
+
+        {children && <div className="mt-4">{children}</div>}
       </div>
     </div>
   );

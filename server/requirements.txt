@@ -9,3 +9,5 @@ openai-whisper
 httpx
 python-multipart
 google-genai
+langchain-openai
+pypdf2

@@ -20,6 +20,7 @@ interface Message {
   image?: string;
   images?: string[];
   isFinal?: boolean;
+  isSetupMessage?: boolean;
 }
 
 // Global TTS reference to prevent Garbage Collection bugs
@@ -257,11 +258,13 @@ const App: React.FC = () => {
     {
       id: "init-1",
       sender: "bot",
-      text: "Hi, I am Essence - your Agentic Critic. Click Mic to start.",
+      text: "Welcome to Essence! Please select an interview mode to begin:",
       isFinal: true,
+      isSetupMessage: true,
     },
   ]);
-  const [appMode, setAppMode] = useState<"project" | "resume">("project");
+  const [appMode, setAppMode] = useState<"project" | "resume" | null>(null);
+  const [setupStep, setSetupStep] = useState<"mode" | "resume_focus" | "resume_time" | "autoplay_config" | "resume_upload" | "complete">("mode");
   const [resumeParsedText, setResumeParsedText] = useState("");
   const [interviewTimeLimit, setInterviewTimeLimit] = useState<number>(15);
   const [interviewFocus, setInterviewFocus] = useState<string>("general");
@@ -276,9 +279,7 @@ const App: React.FC = () => {
   const [pendingImage, setPendingImage] = useState<string[]>([]);
   const [isSharing, setIsSharing] = useState(false);
   const [speakingText, setSpeakingText] = useState<string | null>(null);
-  const [autoplayResponses, setAutoplayResponses] = useState(() => {
-    return localStorage.getItem("autoplayResponses") === "true";
-  });
+  const [autoplayResponses, setAutoplayResponses] = useState(false);
   const [isBackendConnected, setIsBackendConnected] = useState(false);
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -512,6 +513,10 @@ const App: React.FC = () => {
 
                 const hasImages = imagesToUse.length > 0;
                 const displayText = payloadText || (hasImages ? "" : "🎤 (Audio Message)");
+
+                if (displayText.startsWith("[System]")) {
+                  return prev;
+                }
 
                 return [...prev, {
                   id: crypto.randomUUID(),
@@ -921,16 +926,17 @@ const App: React.FC = () => {
   };
 
   const resetSession = () => {
-    const txt = appMode === "project" 
-        ? "Session reset. I am Essence - your Agentic Critic. Please share your project details."
-        : "Session reset. I am Essence - your Agentic Critic. Please upload your resume.";
+    setAppMode(null);
+    setSetupStep("mode");
+    setResumeParsedText("");
     
     setMessages([
       {
         id: "init-" + Date.now(),
         sender: "bot",
-        text: txt,
+        text: "Session reset. Please select an interview mode to begin:",
         isFinal: true,
+        isSetupMessage: true,
       },
     ]);
     
@@ -938,10 +944,10 @@ const App: React.FC = () => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
        wsRef.current.send(JSON.stringify({
           type: "reset",
-          mode: appMode,
-          resume_text: resumeParsedText,
-          focus_mode: interviewFocus,
-          time_limit: interviewTimeLimit
+          mode: "project",
+          resume_text: "",
+          focus_mode: "general",
+          time_limit: 15
        }));
     }
 
@@ -954,11 +960,6 @@ const App: React.FC = () => {
     lastAutoplayMessageIdRef.current = null;
     toast.success("Session reset successfully");
   };
-
-  useEffect(() => {
-    // Automatically reset session when switching modes
-    resetSession();
-  }, [appMode]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -990,11 +991,17 @@ const App: React.FC = () => {
         setResumeParsedText(data.parsed_text);
         toast.success("Resume processed successfully! Starting interview...", { id: toastId });
         
+        setSetupStep("complete");
+        setMessages(prev => [
+            ...prev,
+            { id: crypto.randomUUID(), sender: "user", text: "Uploaded Resume ✅", isFinal: true }
+        ]);
+
         // Let backend know the resume context was loaded
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
            wsRef.current.send(JSON.stringify({
               type: "reset",
-              mode: appMode,
+              mode: appMode || "resume",
               resume_text: data.parsed_text,
               focus_mode: interviewFocus,
               time_limit: interviewTimeLimit
@@ -1222,6 +1229,151 @@ const App: React.FC = () => {
     }
   }
 
+  const handleSelectProjectMode = () => {
+    setAppMode("project");
+    setSetupStep("autoplay_config");
+    setMessages(prev => [
+      ...prev,
+      { id: crypto.randomUUID(), sender: "user", text: "Project Mode", isFinal: true },
+      { id: crypto.randomUUID(), sender: "bot", text: "Project Mode selected. Would you like to enable Autoplay for my voice responses?", isFinal: true, isSetupMessage: true }
+    ]);
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+       wsRef.current.send(JSON.stringify({
+          type: "reset",
+          mode: "project",
+          resume_text: "",
+          focus_mode: "general",
+          time_limit: 15
+       }));
+    }
+  };
+
+  const handleSelectResumeMode = () => {
+    setAppMode("resume");
+    setSetupStep("resume_focus");
+    setMessages(prev => [
+      ...prev,
+      { id: crypto.randomUUID(), sender: "user", text: "Resume Mode", isFinal: true },
+      { id: crypto.randomUUID(), sender: "bot", text: "Please select an interview focus:", isFinal: true, isSetupMessage: true }
+    ]);
+  };
+
+  const handleSelectFocus = (focus: string, label: string) => {
+    setInterviewFocus(focus);
+    setSetupStep("resume_time");
+    setMessages(prev => [
+      ...prev,
+      { id: crypto.randomUUID(), sender: "user", text: label, isFinal: true },
+      { id: crypto.randomUUID(), sender: "bot", text: "Please select an interview time limit:", isFinal: true, isSetupMessage: true }
+    ]);
+  };
+
+  const handleSelectTime = (minutes: number) => {
+    setInterviewTimeLimit(minutes);
+    setSetupStep("autoplay_config");
+    setMessages(prev => [
+      ...prev,
+      { id: crypto.randomUUID(), sender: "user", text: `${minutes} Minutes`, isFinal: true },
+      { id: crypto.randomUUID(), sender: "bot", text: "Would you like to enable Autoplay for my voice responses?", isFinal: true, isSetupMessage: true }
+    ]);
+  };
+
+  const handleSelectAutoplay = (enable: boolean) => {
+    setAutoplayResponses(enable);
+    localStorage.setItem("autoplayResponses", String(enable));
+    
+    if (appMode === "project") {
+      setSetupStep("complete");
+      setMessages(prev => [
+        ...prev,
+        { id: crypto.randomUUID(), sender: "user", text: enable ? "Enable Autoplay" : "Keep Autoplay Off", isFinal: true },
+        { id: crypto.randomUUID(), sender: "bot", text: "Please share your project details (repo link, description, etc.) to get started. Click the Mic when you're ready.", isFinal: true, isSetupMessage: true }
+      ]);
+    } else {
+      setSetupStep("resume_upload");
+      setMessages(prev => [
+        ...prev,
+        { id: crypto.randomUUID(), sender: "user", text: enable ? "Enable Autoplay" : "Keep Autoplay Off", isFinal: true },
+        { id: crypto.randomUUID(), sender: "bot", text: "Please upload your resume to begin.", isFinal: true, isSetupMessage: true }
+      ]);
+    }
+  };
+
+  const renderInteractiveUI = () => {
+    const btnClass = "app-btn bg-secondary text-white hover:brightness-125 px-5 py-2 text-sm shadow-md border border-border transition-all";
+
+    if (setupStep === "mode") {
+      return (
+        <div className="flex flex-row space-x-3 mt-1">
+          <button onClick={handleSelectProjectMode} className={btnClass}>
+            Project Mode
+          </button>
+          <button onClick={handleSelectResumeMode} className={btnClass}>
+            Resume Mode
+          </button>
+        </div>
+      );
+    }
+
+    if (setupStep === "resume_focus") {
+      return (
+        <div className="flex flex-row flex-wrap gap-3 mt-1">
+          <button onClick={() => handleSelectFocus("general", "General")} className={btnClass}>
+            General
+          </button>
+          <button onClick={() => handleSelectFocus("skills", "Technical Skills")} className={btnClass}>
+            Technical Skills
+          </button>
+          <button onClick={() => handleSelectFocus("projects", "Projects Focus")} className={btnClass}>
+            Projects Focus
+          </button>
+        </div>
+      );
+    }
+
+    if (setupStep === "resume_time") {
+      return (
+        <div className="flex flex-row space-x-3 mt-1">
+          <button onClick={() => handleSelectTime(5)} className={btnClass}>
+            5 Minutes
+          </button>
+          <button onClick={() => handleSelectTime(15)} className={btnClass}>
+            15 Minutes
+          </button>
+          <button onClick={() => handleSelectTime(60)} className={btnClass}>
+            60 Minutes
+          </button>
+        </div>
+      );
+    }
+
+    if (setupStep === "autoplay_config") {
+      return (
+        <div className="flex flex-row space-x-3 mt-1">
+          <button onClick={() => handleSelectAutoplay(true)} className={btnClass}>
+            Yes, Enable Autoplay
+          </button>
+          <button onClick={() => handleSelectAutoplay(false)} className={btnClass}>
+            No, Keep it Off
+          </button>
+        </div>
+      );
+    }
+
+    if (setupStep === "resume_upload") {
+      return (
+        <div className="mt-1">
+           <label className={`cursor-pointer flex items-center justify-center ${btnClass}`}>
+             {isUploading ? "Processing..." : "Select Resume (PDF)"}
+             <input type="file" accept=".pdf" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
+           </label>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   if (!isBackendConnected) {
     return (
       <div className="h-screen w-screen flex flex-col bg-background text-foreground overflow-hidden justify-center items-center">
@@ -1267,6 +1419,7 @@ const App: React.FC = () => {
         macroCompletedChunks={currentMacroChunks}
         sectionLabel={currentSectionLabel}
         sectionProgress={currentSectionProgress}
+        isModeLocked={setupStep === "complete"}
       />
 
       {showCompletionModal && (
@@ -1279,81 +1432,24 @@ const App: React.FC = () => {
 
       {/* Chat Area (scrollable only here) */}
       <main id="chat-export" className="flex-1 overflow-y-auto px-4 md:px-16 py-6 space-y-4 scrollbar-hide relative">
-        {messages.length === 1 && (
-          <div className="flex flex-col items-center justify-center space-y-6 mt-10">
-            <div className="bg-secondary/50 p-1.5 rounded-full flex border border-border">
-              <button
-                onClick={() => setAppMode("project")}
-                className={`px-6 py-2 rounded-full font-bold text-sm transition-all ${appMode === "project" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:text-white"}`}
-              >
-                Project Mode
-              </button>
-              <button
-                onClick={() => setAppMode("resume")}
-                className={`px-6 py-2 rounded-full font-bold text-sm transition-all ${appMode === "resume" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:text-white"}`}
-              >
-                Resume Mode
-              </button>
-            </div>
-            
-            {appMode === "resume" && (
-              <div className="w-full max-w-md bg-card/80 p-6 rounded-2xl border border-border flex flex-col space-y-4">
-                <h3 className="text-lg font-bold text-center">Resume Settings</h3>
-                
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium">Interview Focus</label>
-                  <select 
-                    value={interviewFocus}
-                    onChange={(e) => setInterviewFocus(e.target.value)}
-                    className="p-2 rounded-md bg-background border border-border"
-                  >
-                    <option value="general">General</option>
-                    <option value="skills">Technical Skills</option>
-                    <option value="projects">Projects Focus</option>
-                  </select>
-                </div>
+        {messages.map((msg, i) => {
+          const isLast = i === messages.length - 1;
+          const showUI = isLast && msg.sender === "bot" && setupStep !== "complete";
 
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium">Time Limit</label>
-                  <select 
-                    value={interviewTimeLimit}
-                    onChange={(e) => setInterviewTimeLimit(Number(e.target.value))}
-                    className="p-2 rounded-md bg-background border border-border"
-                  >
-                    <option value={5}>5 Minutes</option>
-                    <option value={15}>15 Minutes</option>
-                    <option value={60}>60 Minutes</option>
-                  </select>
-                </div>
-                
-                <div className="pt-2">
-                   {!resumeParsedText ? (
-                      <label className="app-btn w-full flex justify-center items-center py-2 bg-primary cursor-pointer">
-                        {isUploading ? "Processing..." : "Select Resume (PDF)"}
-                        <input type="file" accept=".pdf" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
-                      </label>
-                   ) : (
-                      <div className="p-3 bg-primary/20 border border-primary/40 rounded-lg text-center text-sm font-medium">
-                        Resume Loaded ✓. Interview is starting!
-                      </div>
-                   )}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {messages.map((msg, i) => (
-          <ChatMessage
-            key={i}
-            sender={msg.sender}
-            text={msg.text}
-            image={msg.image}
-            images={msg.images}
-            isPlaying={speakingText === msg.text}
-            onPlay={handleManualMicClick}
-          />
-        ))}
+          return (
+            <ChatMessage
+              key={msg.id || i}
+              sender={msg.sender}
+              text={msg.text}
+              image={msg.image}
+              images={msg.images}
+              isPlaying={speakingText === msg.text}
+              onPlay={msg.isSetupMessage ? undefined : handleManualMicClick}
+            >
+              {showUI && renderInteractiveUI()}
+            </ChatMessage>
+          );
+        })}
         <div ref={chatEndRef} />
 
         {/* Context Preview Indicator - Always show if image pending or active */}
