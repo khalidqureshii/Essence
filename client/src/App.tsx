@@ -290,7 +290,7 @@ const App: React.FC = () => {
   const [hasConcluded, setHasConcluded] = useState(false);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (setupStep === "complete" && appMode === "resume") {
       interval = setInterval(() => {
         setTimeRemaining(prev => {
