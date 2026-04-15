@@ -995,7 +995,7 @@ const App: React.FC = () => {
     formData.append("file", file);
 
     try {
-      const response = await fetch(`${LOCAL_API_BASE_URL}/api/upload_resume`, {
+      const response = await fetch(`${API_BASE_URL}/api/upload_resume`, {
         method: "POST",
         body: formData,
       });
@@ -1252,7 +1252,7 @@ const App: React.FC = () => {
       setLoading(true)
       console.log("📡 Sending request to LOCAL /api/interview_report endpoint")
 
-      const response = await fetch(`${LOCAL_API_BASE_URL}/api/interview_report`, {
+      const response = await fetch(`${API_BASE_URL}/api/interview_report`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 

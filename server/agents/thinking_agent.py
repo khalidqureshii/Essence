@@ -14,12 +14,6 @@ class ThinkingAgent:
             model_name=model_name,
             streaming=True
         )
-        self.resume_llm = ChatOpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=Config.OPENROUTER_API_KEY or "sk-dummy",
-            model="openai/gpt-oss-120b",
-            streaming=True
-        ) if Config.OPENROUTER_API_KEY else self.llm
 
     async def stream_critique(self, transcript: str, image_data: Optional[str] = None, memory_context: str = "", history: List[Dict] = [], custom_system_prompt: Optional[str] = None, mode: str = "project") -> AsyncIterable[str]:
         # Default prompt if no custom logic provided
@@ -59,8 +53,6 @@ class ThinkingAgent:
 
         messages.append(HumanMessage(content=content))
 
-        active_llm = self.resume_llm if mode == "resume" else self.llm
-
-        async for chunk in active_llm.astream(messages):
+        async for chunk in self.llm.astream(messages):
             if chunk.content:
                 yield chunk.content
