@@ -16,7 +16,7 @@ interface FeedbackSectionProps {
   }
 }
 
-export default function FeedbackSection({ strengths, improvements, recommendations, next_steps }: FeedbackSectionProps) {
+export default function FeedbackSection({ strengths = [], improvements = [], recommendations = [], next_steps = { priority_fixes: '', short_term_goals: '', long_term_goals: '' } }: FeedbackSectionProps) {
   const [expandedSection, setExpandedSection] = useState<'strengths' | 'improvements' | 'recommendations'>('strengths')
 
   return (

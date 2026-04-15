@@ -160,6 +160,20 @@ export default function Home({ onBack, report }: ProjectReportProps) {
   // Sample evaluation data - replace with actual API call
 
 
+  if (!report?.report) {
+    return (
+      <div className="min-h-screen w-full bg-background text-foreground flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-muted-foreground text-sm font-medium">Generating Report...</p>
+          <button onClick={onBack} className="text-xs text-muted-foreground hover:text-white underline mt-4">
+            ← Back to Chat
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen w-full bg-background text-foreground">
       <Header overallScore={report.report.overall_score} onBack={onBack} />

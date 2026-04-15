@@ -1488,6 +1488,16 @@ const App: React.FC = () => {
       <Toaster position="top-center" toastOptions={{
         style: { background: '#333', color: '#fff' }
       }} />
+
+      {/* Global Loading Overlay for Report Generation */}
+      {loading && (
+        <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-background/80 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mb-6 shadow-[0_0_15px_rgba(20,184,166,0.5)]" />
+          <h2 className="text-2xl font-bold text-foreground mb-2">Analyzing Session Data...</h2>
+          <p className="text-muted-foreground text-sm">Generating comprehensive evaluation report. This may take a minute.</p>
+        </div>
+      )}
+
       {/* Header */}
 
       <Navbar
@@ -1507,7 +1517,7 @@ const App: React.FC = () => {
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
-        macroCompletedChunks={serverProgressData ? serverProgressData.macro_completed_chunks : evaluationState.completedSections}
+        macroCompletedChunks={currentMacroChunks}
         sectionLabel={currentSectionLabel}
         sectionProgress={currentSectionProgress}
         appMode={appMode}

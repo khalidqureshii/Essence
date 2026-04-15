@@ -260,15 +260,20 @@ class ConversationManager:
 
     def get_progress_data(self):
         section_name = "N/A"
-        if 0 <= self.section_index < len(EVALUATION_QUESTIONS):
+        completed_sections = 0
+
+        if self.state == ConversationState.PASSIVE_LISTENING:
+            section_name = "Project Understanding"
+            completed_sections = 0
+        elif 0 <= self.section_index < len(EVALUATION_QUESTIONS):
             section_name = EVALUATION_QUESTIONS[self.section_index]["section"]
+            completed_sections = self.section_index
         elif self.state == ConversationState.COMPLETED:
             section_name = "Evaluation Completed"
-        elif self.state == ConversationState.PASSIVE_LISTENING:
-            section_name = "Project Presentation"
+            completed_sections = 5  # All 5 eval sections done → Results/Report phase
             
         return {
-            "macro_completed_chunks": self.global_completed_questions,
+            "macro_completed_chunks": completed_sections,
             "micro_section_progress": min(round(self.section_progress, 1), 100.0),
             "section": section_name,
             "state": self.state.name
