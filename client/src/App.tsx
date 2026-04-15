@@ -6,6 +6,7 @@ import { Toaster, toast } from "react-hot-toast";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import ProjectReport from "./Pages/ProjectReport";
+import InterviewReport from "./Pages/InterviewReport";
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
 import CompletionDashboard from "./components/CompletionDashboard";
@@ -284,7 +285,44 @@ const App: React.FC = () => {
   const [isBackendConnected, setIsBackendConnected] = useState(false);
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [reportGenerationCount, setReportGenerationCount] = useState(0)
+  const [reportGenerationCount, setReportGenerationCount] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const [hasConcluded, setHasConcluded] = useState(false);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (setupStep === "complete" && appMode === "resume") {
+      interval = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev === null) return null;
+          if (prev <= 0) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [setupStep, appMode]);
+
+  useEffect(() => {
+    if (timeRemaining === 0 && !hasConcluded && appMode === "resume" && setupStep === "complete") {
+      // If the timer is 0 and there is no active input/speaking, conclude the interview automatically
+      if (!isRecording && status === "INACTIVE" && currentDraft.trim() === "" && pendingImage.length === 0) {
+        setHasConcluded(true);
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+           wsRef.current.send(JSON.stringify({ 
+             type: "text_input", 
+             text: "[System] The interview time has expired. The user has not provided further input and is idle. Please conclude the interview immediately using a standard closing line. Do not ask any further questions.",
+             mode: "append" 
+           }));
+           wsRef.current.send(JSON.stringify({ type: "commit" }));
+        }
+      }
+    }
+  }, [timeRemaining, hasConcluded, appMode, setupStep, isRecording, status, currentDraft, pendingImage]);
+
   const [evaluationState, dispatchEvaluation] = useReducer(evaluationReducer, {
     currentSectionIndex: 0,
     currentSection: EVALUATION_SECTIONS[0].key,
@@ -958,6 +996,8 @@ const App: React.FC = () => {
     setPendingImage([]);
     setReport(null);
     setReportGenerationCount(0);
+    setTimeRemaining(null);
+    setHasConcluded(false);
     setShowCompletionModal(false);
     lastAutoplayMessageIdRef.current = null;
     toast.success("Session reset successfully");
@@ -994,6 +1034,7 @@ const App: React.FC = () => {
         toast.success("Resume processed successfully! Starting interview...", { id: toastId });
         
         setSetupStep("complete");
+        setTimeRemaining(interviewTimeLimit * 60);
         setMessages(prev => [
             ...prev,
             { id: crypto.randomUUID(), sender: "user", text: "Uploaded Resume ✅", isFinal: true }
@@ -1068,6 +1109,14 @@ const App: React.FC = () => {
     }
 
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      if (timeRemaining === 0 && !hasConcluded && appMode === "resume" && setupStep === "complete") {
+         setHasConcluded(true);
+         wsRef.current.send(JSON.stringify({ 
+           type: "text_input", 
+           text: " [System] The interview time has expired. Please address the user's response concisely and then immediately conclude the interview with a closing line. Do not ask any further questions.", 
+           mode: "append" 
+         }));
+      }
       console.log("🚀 Sending commit to backend");
       wsRef.current.send(JSON.stringify({ type: "commit" }));
     }
@@ -1151,8 +1200,8 @@ const App: React.FC = () => {
     }
   };
 
-  const generateReport = async () => {
-    console.log("🔵 Generate Report clicked")
+  const generateProjectReport = async () => {
+    console.log("🔵 Generate Project Report clicked")
 
     if (reportGenerationCount >= MAX_REPORT_GENERATIONS) {
       console.log("⚠️ Report already generated, switching to report view")
@@ -1172,44 +1221,31 @@ const App: React.FC = () => {
 
       console.log("📥 Response received:", response.status)
       const data = await response.json()
-      console.log("✅ Raw report data:", data)
+      console.log("✅ Raw project report data:", data)
 
-      // Check for error in response
       if (data.error) {
         console.error("❌ Backend returned error:", data.error)
         toast.error(`Report generation failed: ${data.error}`)
         return
       }
 
-      // Validate the report structure
-      if (!data.report) {
-        console.error("❌ No report field in response")
-        toast.error("Invalid response format from server")
-        return
-      }
-
-      // The backend now returns proper JSON object, but handle legacy string format too
       let parsedReport = data
 
       if (typeof data.report === 'string') {
-        console.log("⚠️ Report is a string (legacy format), attempting to parse...")
         try {
           let reportStr = data.report.trim()
-          // Remove markdown code blocks if present
           if (reportStr.startsWith('```json')) {
             reportStr = reportStr.replace(/^```json\s*/, '').replace(/\s*```$/, '')
           } else if (reportStr.startsWith('```')) {
             reportStr = reportStr.replace(/^```\s*/, '').replace(/\s*```$/, '')
           }
           parsedReport = { report: JSON.parse(reportStr) }
-          console.log("✅ Successfully parsed string JSON report")
         } catch (parseError) {
           console.error("❌ Failed to parse report JSON:", parseError)
           toast.error("Report format is invalid - not valid JSON")
           return
         }
       } else if (typeof data.report === 'object') {
-        console.log("✅ Report is already a JSON object (expected format)")
         parsedReport = data
       } else {
         console.error("❌ Unexpected report format:", typeof data.report)
@@ -1217,17 +1253,74 @@ const App: React.FC = () => {
         return
       }
 
-      console.log("📊 Final parsed report structure:", parsedReport)
       setReport(parsedReport)
       setReportGenerationCount(prev => prev + 1)
-
-      setView("report") // ✅ switch to report view
+      setView("report")
 
     } catch (error) {
-      console.error("❌ Failed to generate report:", error)
+      console.error("❌ Failed to generate project report:", error)
       toast.error("Failed to generate report")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const generateInterviewReport = async () => {
+    console.log("🔵 Generate Interview Report clicked")
+    console.log("📋 interviewFocus:", interviewFocus, "timeLimit:", interviewTimeLimit)
+    console.log("📋 resumeParsedText length:", resumeParsedText?.length)
+    console.log("📋 messages:", messages.length)
+
+    if (reportGenerationCount >= MAX_REPORT_GENERATIONS) {
+      console.log("⚠️ Report already generated, switching to report view")
+      setView("report")
+      return
+    }
+
+    try {
+      setLoading(true)
+      console.log("📡 Sending request to LOCAL /api/interview_report endpoint")
+
+      const response = await fetch(`${LOCAL_API_BASE_URL}/api/interview_report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          chat_history: messages,
+          resume_text: resumeParsedText || "",
+          interview_type: interviewFocus || "general",
+          duration_mins: interviewTimeLimit || 5
+        })
+      })
+
+      console.log("📥 HTTP status:", response.status)
+      const data = await response.json()
+      console.log("📦 Raw response data:", JSON.stringify(data).slice(0, 500))
+      
+      if (data.error) {
+        console.error("❌ Backend returned error:", data.error, data.raw_response)
+        toast.error(`Report generation failed: ${data.error}`)
+        return
+      }
+
+      // data = { report: { meta, scorecard, ... } }
+      console.log("✅ Setting report data, keys:", Object.keys(data))
+      setReport(data)
+      setReportGenerationCount(prev => prev + 1)
+      setView("report")
+
+    } catch (error) {
+      console.error("❌ Failed to generate interview report:", error)
+      toast.error("Failed to generate report")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const generateReport = async () => {
+    if (appMode === "resume") {
+      await generateInterviewReport()
+    } else {
+      await generateProjectReport()
     }
   }
 
@@ -1336,6 +1429,9 @@ const App: React.FC = () => {
     if (setupStep === "resume_time") {
       return (
         <div className="flex flex-row space-x-3 mt-1">
+          <button onClick={() => handleSelectTime(1)} className={btnClass}>
+            1 Minute
+          </button>
           <button onClick={() => handleSelectTime(5)} className={btnClass}>
             5 Minutes
           </button>
@@ -1385,7 +1481,11 @@ const App: React.FC = () => {
   }
 
   if (view === "report") {
-    return <ProjectReport onBack={() => setView("chat")} report={report} />;
+    if (appMode === "resume") {
+      return <InterviewReport onBack={() => setView("chat")} report={report} duration={interviewTimeLimit || 15} />;
+    } else {
+      return <ProjectReport onBack={() => setView("chat")} report={report} />;
+    }
   }
 
   const currentSectionLabel =
@@ -1422,6 +1522,7 @@ const App: React.FC = () => {
         sectionLabel={currentSectionLabel}
         sectionProgress={currentSectionProgress}
         isModeLocked={setupStep === "complete"}
+        timeRemaining={timeRemaining}
         onToggleSidebar={() => setIsSidebarOpen(true)}
       />
 
@@ -1463,8 +1564,28 @@ const App: React.FC = () => {
         })}
         <div ref={chatEndRef} />
 
+        {/* See Feedback Button */}
+        {(hasConcluded || (appMode === "resume" && serverProgressData?.section === "COMPLETED")) && status !== "RESPONDING" && (
+           <div className="flex justify-center mt-8 animate-in fade-in slide-in-from-bottom pb-8">
+             <button
+               onClick={generateReport}
+               disabled={loading}
+               className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-4 px-8 rounded-full shadow-xl hover:scale-105 transition-all flex items-center gap-2 text-lg disabled:opacity-70 disabled:hover:scale-100"
+             >
+               {loading ? (
+                 <div className="flex items-center space-x-2">
+                   <div className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                   <span>Generating Feedback...</span>
+                 </div>
+               ) : (
+                 "SEE FEEDBACK"
+               )}
+             </button>
+           </div>
+        )}
+
         {/* Context Preview Indicator - Always show if image pending or active */}
-        {(status === "ACTIVE" || status === "RESPONDING" || pendingImage.length > 0) && (
+        {!(hasConcluded || serverProgressData?.section === "COMPLETED") && (status === "ACTIVE" || status === "RESPONDING" || pendingImage.length > 0) && (
           <div className="fixed bottom-24 right-4 flex flex-col items-end space-y-2 animate-in fade-in slide-in-from-bottom-2 z-50">
             {pendingImage.length > 0 && (
               <div className="flex gap-2">
@@ -1515,7 +1636,7 @@ const App: React.FC = () => {
           onStopSharing={stopScreenShare}
           isRecording={isRecording}
           isSharing={isSharing}
-          disabled={status === "RESPONDING"}
+          disabled={status === "RESPONDING" || hasConcluded || (appMode === "resume" && serverProgressData?.section === "COMPLETED")}
         />
         <div className="text-xs text-muted-foreground text-center mt-2">
           Click Mic to start and stop recording

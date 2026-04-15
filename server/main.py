@@ -211,6 +211,12 @@ async def upload_resume(file: UploadFile = File(...)):
 class ReportRequest(BaseModel):
     chat_history: List[Dict[str, Any]]
 
+class InterviewReportRequest(BaseModel):
+    chat_history: List[Dict[str, Any]]
+    resume_text: str
+    interview_type: str
+    duration_mins: int
+
 @app.post("/report")
 async def generate_report(request: ReportRequest):
     logger.info("Generating project report...")
@@ -227,6 +233,26 @@ async def generate_report(request: ReportRequest):
     
     logger.info(f"Transformed {len(transformed_history)} messages for report generation")
     report = await report_agent.generate_project_report(transformed_history)
+    return {"report": report}
+
+@app.post("/api/interview_report")
+async def generate_interview_report(request: InterviewReportRequest):
+    logger.info("Generating interview report...")
+    
+    transformed_history = []
+    for msg in request.chat_history:
+        transformed_history.append({
+            "role": "assistant" if msg.get("sender") == "bot" else "user",
+            "content": msg.get("text", "")
+        })
+    
+    logger.info(f"Transformed {len(transformed_history)} messages for interview report generation")
+    report = await report_agent.generate_interview_report(
+        chat_history=transformed_history,
+        resume_text=request.resume_text,
+        interview_type=request.interview_type,
+        duration_mins=request.duration_mins
+    )
     return {"report": report}
 
 if __name__ == "__main__":

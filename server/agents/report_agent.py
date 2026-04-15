@@ -153,8 +153,157 @@ class ReportAgent:
                 }
 
         except Exception as e:
-            logger.error(f"Error generating report: {e}")
-            return {"error": f"Error generating report: {str(e)}"}
+            logger.error(f"Error generating project report: {e}")
+            return {"error": f"Error generating project report: {str(e)}"}
+
+    async def generate_interview_report(self, chat_history: list, resume_text: str, interview_type: str, duration_mins: int) -> dict:
+        if not self.client:
+            return {"error": "Error: Gemini API key not configured."}
+
+        if not chat_history:
+            return {"error": "Error: No chat history provided."}
+
+        # Format duration string as expected by prompt
+        if duration_mins <= 5:
+            duration_str = "5min"
+        elif duration_mins <= 15:
+            duration_str = "15min"
+        else:
+            duration_str = "60min"
+
+        try:
+            formatted_history = ""
+            for msg in chat_history:
+                role = msg.get("role", "unknown")
+                content = msg.get("content", "")
+                formatted_history += f"[{role.upper()}]: {content}\n"
+
+            prompt = f"""
+# ROLE
+You are an expert interview evaluator and career coach. Your task is to analyse a completed interview session and generate a structured, detailed, and actionable feedback report for the candidate.
+
+# CONTEXT VARIABLES
+{{INTERVIEW_TYPE}}: {interview_type}
+{{INTERVIEW_DURATION}}: {duration_str}
+{{INTERVIEW_MODE}}: "chat"
+{{RESUME_DATA}}: {resume_text}
+{{TRANSCRIPT}}:
+{formatted_history}
+
+# FEEDBACK DEPTH BY DURATION
+IF {duration_str} == "5min":
+  Generate: scorecard_summary, top_strengths(3), improvement_areas(2), readiness_verdict
+
+IF {duration_str} == "15min":
+  Generate: scorecard_summary, section_breakdown, per_question_highlights, top_strengths(3), improvement_areas(3), readiness_verdict, suggested_followups
+
+IF {duration_str} == "60min":
+  Generate: ALL sections — full per_question_analysis, resume_vs_answer_consistency, communication_metrics, scorecard_summary, section_breakdown, top_strengths(5), improvement_areas(5), readiness_verdict, suggested_followups, prep_plan
+
+# OUTPUT SCHEMA — return strict JSON
+{{
+  "meta": {{
+    "interview_type": "{interview_type}",
+    "duration": "{duration_str}",
+    "mode": "chat",
+    "generated_at": "YYYY-MM-DDTHH:MM:SSZ"
+  }},
+  "scorecard": {{
+    "overall_score": 0,
+    "dimensions": [
+      {{ "name": "string", "score": 0, "weight": 0.0, "summary": "string" }}
+    ]
+  }},
+  "section_breakdown": [
+    {{ "section": "string", "score": 0, "highlight": "string" }}
+  ],
+  "per_question_analysis": [
+    {{
+      "question": "string",
+      "candidate_answer_summary": "string",
+      "score": 0,
+      "star_method_used": false,
+      "completeness": "complete",
+      "what_was_strong": "string",
+      "what_was_missing": "string",
+      "model_answer_hint": "string"
+    }}
+  ],
+  "resume_consistency": {{
+    "consistent_points": ["string"],
+    "discrepancies": [
+      {{ "resume_claim": "string", "interview_response": "string", "flag": "string" }}
+    ],
+    "unexplored_resume_strengths": ["string"]
+  }},
+  "communication_metrics": {{
+    "response_length_quality": "optimal",
+    "structured_thinking_score": 0,
+    "active_listening_score": 0
+  }},
+  "strengths": [
+    {{ "title": "string", "evidence": "string" }}
+  ],
+  "improvement_areas": [
+    {{ "title": "string", "issue": "string", "actionable_tip": "string" }}
+  ],
+  "suggested_followups": [
+    {{ "original_question": "string", "better_approach": "string" }}
+  ],
+  "readiness_verdict": {{
+    "status": "interview_ready",
+    "label": "string",
+    "summary": "string",
+    "next_step": "string"
+  }},
+  "prep_plan": {{
+    "focus_topics": ["string"],
+    "question_types_to_practice": ["string"],
+    "estimated_ready_in": "string"
+  }}
+}}
+
+# STRICT RULES
+- Return ONLY the JSON object. No markdown, no preamble, no explanation.
+- Scores must be integers. Weights must sum to 1.0.
+- Evidence in strengths must reference actual transcript content.
+- Discrepancies must only be flagged when there is clear contradiction, not minor elaboration.
+- Adapt dimension names for interview_type:
+    general      -> Communication, Self-Awareness, Cultural Fit, Storytelling, Confidence
+    technical    -> Conceptual Accuracy, Problem Approach, Edge Case Awareness, Terminology, Depth
+    projects     -> Ownership, Decision Articulation, Challenge Handling, Outcome Quantification, Depth
+- Audio metrics are disabled for chat mode.
+"""
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
+
+            logger.info("Raw LLM response received for interview")
+            response_text = response.text.strip()
+            
+            if response_text.startswith('```json'):
+                response_text = response_text.replace('```json', '', 1)
+                response_text = response_text.rsplit('```', 1)[0]
+            elif response_text.startswith('```'):
+                response_text = response_text.replace('```', '', 1)
+                response_text = response_text.rsplit('```', 1)[0]
+                
+            response_text = response_text.strip()
+            
+            try:
+                parsed_json = json.loads(response_text)
+                return parsed_json
+            except json.JSONDecodeError as je:
+                logger.error(f"❌ Failed to parse LLM interview response as JSON: {je}")
+                return {
+                    "error": "LLM returned invalid JSON",
+                    "raw_response": response_text[:500]
+                }
+
+        except Exception as e:
+            logger.error(f"Error generating interview report: {e}")
+            return {"error": f"Error generating interview report: {str(e)}"}
 
 # Global instance
 report_agent = ReportAgent(
