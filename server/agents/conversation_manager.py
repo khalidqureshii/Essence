@@ -60,10 +60,24 @@ class ConversationManager:
         self.follow_up_count = 0 
         self.last_ai_question_was_screenshot_prompt = False
         
+        # Time-based depth control
+        self.time_limit_mins = 15
+        self.max_follow_ups = 1  # Default: 1 follow-up per question
+        
         # Dual-Layer Progress State
         self.global_completed_questions = 0  # Macro: 0-15 chunks
         self.section_progress = 0.0          # Micro: 0-100% per section
         self.current_section_question_count = 0 # 0-3 internal tracker
+
+    def setup_evaluation(self, time_limit_mins: int = 15):
+        """Configure evaluation depth based on selected time limit."""
+        self.time_limit_mins = time_limit_mins
+        if time_limit_mins <= 5:
+            self.max_follow_ups = 0   # Rush: core questions only
+        elif time_limit_mins <= 15:
+            self.max_follow_ups = 1   # Standard: 1 follow-up allowed
+        else:
+            self.max_follow_ups = 3   # Deep-dive: thorough follow-ups
 
     def update_history(self, user_text: str, ai_text: str):
         self.history.append(HumanMessage(content=user_text))
@@ -139,10 +153,12 @@ class ConversationManager:
                      "PROMPT: 'If available, please share relevant screenshots of the output or functionality to better understand the result.'\n"
                      "Do NOT ask the next question yet. Just give this optional prompt and wait.\n"
                  )
-            elif self.follow_up_count < 1: # Reduced to 1 follow-up for tighter flow as per requirements
+            elif self.follow_up_count < self.max_follow_ups:
                 state_specific = (
                     f"STATE: EVALUATION (Current Scope: {section})\n"
                     f"Current Core Question: \"{question}\"\n\n"
+                    f"TIME CONTEXT: The user selected a {self.time_limit_mins}-minute session. "
+                    f"{'Move quickly through questions — avoid excessive follow-ups.' if self.time_limit_mins <= 5 else 'Balance depth with pace.' if self.time_limit_mins <= 15 else 'Take your time to explore answers thoroughly.'}\n\n"
                     "ADAPTIVE FOLLOW-UP MODE:\n"
                     "1. Evaluate if the answer to the previous core question or follow-up needs clarification.\n"
                     "- Is it too high-level or vague?\n"
@@ -150,7 +166,7 @@ class ConversationManager:
                     "- Is it internally inconsistent or overly abstract?\n"
                     "2. If clarification is needed, ASK A FOLLOW-UP. Keep it short, focused, and concrete.\n"
                     f"3. If the answer is clear, consistent, and specific, ask the current Core Question EXHIBITING THIS EXACT TEXT: \"{question}\"\n"
-                    f"4. If you have already asked {self.follow_up_count} follow-up(s), prioritize moving to the core question.\n"
+                    f"4. If you have already asked {self.follow_up_count}/{self.max_follow_ups} follow-up(s), prioritize moving to the core question.\n"
                 )
             else:
                 state_specific = (
@@ -219,7 +235,7 @@ class ConversationManager:
         else:
             self.follow_up_count += 1
             self.last_ai_question_was_screenshot_prompt = False
-            if self.follow_up_count >= 2: 
+            if self.follow_up_count >= max(1, self.max_follow_ups + 1): 
                 did_move_past_question = True
                 self.question_in_section_index += 1
                 self.follow_up_count = 0
@@ -268,4 +284,6 @@ class ConversationManager:
         self.global_completed_questions = 0
         self.section_progress = 0.0
         self.current_section_question_count = 0
+        self.time_limit_mins = 15
+        self.max_follow_ups = 1
 

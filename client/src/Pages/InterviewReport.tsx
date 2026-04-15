@@ -70,6 +70,17 @@ export default function InterviewReport({ onBack, report, duration }: InterviewR
       </div>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8 pb-32">
+
+        {/* Short Interview Disclaimer Banner */}
+        {meta.disclaimer && (
+          <div className="rounded-2xl p-5 bg-amber-500/10 border border-amber-500/40 flex items-start gap-4 shadow-md animate-in fade-in">
+            <AlertCircle className="text-amber-500 flex-shrink-0 mt-0.5" size={22} />
+            <div>
+              <h3 className="font-bold text-amber-500 text-sm uppercase tracking-wider mb-1">Limited Data Notice</h3>
+              <p className="text-sm text-foreground/80 leading-relaxed">{meta.disclaimer}</p>
+            </div>
+          </div>
+        )}
         
         {/* 1. Verdict Banner */}
         <section className={`rounded-3xl p-8 border ${currentVerdict.border} ${currentVerdict.bg} flex flex-col md:flex-row items-center justify-between gap-8 backdrop-blur-sm shadow-xl`}>

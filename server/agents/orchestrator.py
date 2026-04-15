@@ -18,7 +18,8 @@ class AgentOrchestrator:
         self.current_mode = mode
         if mode == "resume":
             self.resume_manager.setup_interview(resume_text, focus_mode, time_limit_mins)
-            
+        else:
+            self.conversation_manager.setup_evaluation(time_limit_mins)
     async def run_flow(self, transcript: str, image_data: List[str] = None):
         manager = self.resume_manager if self.current_mode == "resume" else self.conversation_manager
         

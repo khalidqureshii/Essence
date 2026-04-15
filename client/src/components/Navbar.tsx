@@ -12,7 +12,6 @@ interface NavbarProps {
   sectionLabel: string;
   sectionProgress: number;
   isModeLocked: boolean;
-  timeRemaining?: number | null;
   onToggleSidebar: () => void;
 }
 // Navbar for navigation
@@ -27,21 +26,12 @@ const Navbar: React.FC<NavbarProps> = ({
   sectionLabel,
   sectionProgress,
   isModeLocked,
-  timeRemaining,
   onToggleSidebar
 }) => {
   const [isRightMenuOpen, setIsRightMenuOpen] = useState(false);
 
   // Clean modern sans-serif stack
   const sansStyle = { fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif" };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const totalNodes = 6;
 
   return (
     <header
@@ -61,46 +51,11 @@ const Navbar: React.FC<NavbarProps> = ({
         </button>
       </div>
 
-      {/* Center: Absolute Perfect Centered Brand */}
+      {/* Center: Brand */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none">
         <h1 className="text-3xl font-black text-white tracking-tighter shadow-lg">
           Essence
         </h1>
-        {timeRemaining !== undefined && timeRemaining !== null && (
-          (() => {
-            const isSafe = timeRemaining > 120; // > 2 mins
-            const isWarning = timeRemaining > 60 && timeRemaining <= 120; // 1-2 mins
-            const isCritical = timeRemaining > 0 && timeRemaining <= 60; // < 1 min
-            const isFinished = timeRemaining === 0;
-
-            let glowColorStr = isSafe ? 'rgba(52,211,153,0.2)' : isWarning ? 'rgba(251,191,36,0.3)' : isCritical ? 'rgba(239,68,68,0.4)' : 'transparent';
-            let borderColor = isSafe ? 'border-emerald-500/30' : isWarning ? 'border-amber-500/50' : isCritical ? 'border-red-500/80' : 'border-white/10';
-            let textColor = isSafe ? 'text-emerald-400' : isWarning ? 'text-amber-400' : isCritical ? 'text-red-400' : 'text-muted-foreground';
-            let dotColor = isSafe ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' : isWarning ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]';
-
-            return (
-              <div 
-                className={`mt-1.5 relative flex items-center justify-center rounded-full bg-black/40 px-3.5 py-1 backdrop-blur-md transition-all duration-700 min-w-[90px] border ${borderColor}`}
-                style={{
-                  boxShadow: `0 0 15px ${glowColorStr} inset, 0 4px 10px rgba(0,0,0,0.3)`
-                }}
-              >
-                 {isCritical && (
-                   <div className="absolute inset-0 rounded-full border border-red-500 shadow-[0_0_12px_rgba(239,68,68,0.8)] animate-pulse pointer-events-none" />
-                 )}
-                 
-                 {/* Live dot indicator */}
-                 {!isFinished && (
-                   <div className={`w-1.5 h-1.5 rounded-full mr-2 animate-pulse ${dotColor}`} />
-                 )}
-
-                 <span className={`relative z-10 text-[13px] font-black font-mono tracking-widest drop-shadow-md transition-colors duration-500 ${textColor}`}>
-                   {formatTime(timeRemaining)}
-                 </span>
-              </div>
-            );
-          })()
-        )}
       </div>
 
       {/* Right: Controls */}

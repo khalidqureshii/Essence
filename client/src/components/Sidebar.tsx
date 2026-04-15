@@ -7,6 +7,7 @@ interface SidebarProps {
   macroCompletedChunks: number;
   sectionLabel: string;
   sectionProgress: number;
+  appMode: "project" | "resume" | null;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -15,11 +16,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   macroCompletedChunks,
   sectionLabel,
   sectionProgress,
+  appMode,
 }) => {
-  const totalNodes = 6;
   const sansStyle = { fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif" };
 
-  const EVALUATION_SECTIONS = [
+  const PROJECT_SECTIONS = [
     "Project Understanding",
     "UI & User Experience",
     "Design Decisions & Trade-offs",
@@ -27,6 +28,19 @@ const Sidebar: React.FC<SidebarProps> = ({
     "Limitations & Improvements",
     "Results / Report"
   ];
+
+  const RESUME_SECTIONS = [
+    "Introduction",
+    "Experience",
+    "Skills",
+    "Projects Focus",
+    "Education",
+    "Extra Curriculars",
+    "HR & Behavioral"
+  ];
+
+  const EVALUATION_SECTIONS = appMode === "resume" ? RESUME_SECTIONS : PROJECT_SECTIONS;
+  const totalNodes = EVALUATION_SECTIONS.length;
 
   return (
     <>

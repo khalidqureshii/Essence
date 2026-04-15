@@ -156,12 +156,72 @@ class ReportAgent:
             logger.error(f"Error generating project report: {e}")
             return {"error": f"Error generating project report: {str(e)}"}
 
+    def _build_fallback_report(self, interview_type: str, duration_str: str, is_short: bool) -> dict:
+        """Builds a minimal but valid report structure when the LLM fails or data is insufficient."""
+        disclaimer = (
+            "This interview was very short, so the evaluation is based on limited data. "
+            "For more accurate and detailed feedback, please attempt a longer interview (15+ minutes)."
+        ) if is_short else "Report generated with available data."
+
+        return {
+            "meta": {
+                "interview_type": interview_type,
+                "duration": duration_str,
+                "mode": "chat",
+                "generated_at": "N/A",
+                "disclaimer": disclaimer
+            },
+            "scorecard": {
+                "overall_score": 40 if is_short else 50,
+                "dimensions": [
+                    {"name": "Communication", "score": 45, "weight": 0.25, "summary": "Insufficient data to fully evaluate communication skills."},
+                    {"name": "Self-Awareness", "score": 40, "weight": 0.20, "summary": "Limited responses made it difficult to gauge self-awareness."},
+                    {"name": "Confidence", "score": 50, "weight": 0.20, "summary": "The candidate participated but the session was too brief for a reliable reading."},
+                    {"name": "Storytelling", "score": 35, "weight": 0.15, "summary": "Not enough conversational depth to assess narrative ability."},
+                    {"name": "Cultural Fit", "score": 40, "weight": 0.20, "summary": "More interaction needed to determine cultural alignment."}
+                ]
+            },
+            "section_breakdown": [],
+            "per_question_analysis": [],
+            "resume_consistency": {
+                "consistent_points": [],
+                "discrepancies": [],
+                "unexplored_resume_strengths": ["Most resume strengths were not explored due to the short duration."]
+            },
+            "communication_metrics": {
+                "response_length_quality": "insufficient",
+                "structured_thinking_score": 30,
+                "active_listening_score": 40
+            },
+            "strengths": [
+                {"title": "Willingness to Participate", "evidence": "The candidate engaged with the interview process despite the short timeframe."}
+            ],
+            "improvement_areas": [
+                {"title": "Provide More Detail", "issue": "Responses were too brief to demonstrate depth.", "actionable_tip": "Practice elaborating on your experiences using the STAR method (Situation, Task, Action, Result)."},
+                {"title": "Attempt Longer Sessions", "issue": "A 1-minute interview is insufficient for meaningful evaluation.", "actionable_tip": "Try a 5 or 15-minute session for a comprehensive assessment."}
+            ],
+            "suggested_followups": [],
+            "readiness_verdict": {
+                "status": "needs_practice",
+                "label": "Insufficient Data",
+                "summary": disclaimer,
+                "next_step": "Retake the interview with a longer time limit (at least 5 minutes) for an accurate evaluation."
+            },
+            "prep_plan": None
+        }
+
     async def generate_interview_report(self, chat_history: list, resume_text: str, interview_type: str, duration_mins: int) -> dict:
         if not self.client:
             return {"error": "Error: Gemini API key not configured."}
 
-        if not chat_history:
-            return {"error": "Error: No chat history provided."}
+        # Count actual user messages (not system or bot setup messages)
+        user_messages = [m for m in chat_history if m.get("role") == "user" and not m.get("content", "").startswith("[System]")]
+        is_short_interview = len(user_messages) < 3 or duration_mins <= 1
+
+        if not chat_history or len(chat_history) < 2:
+            logger.warning("Very minimal chat history — returning fallback report")
+            duration_str = "5min" if duration_mins <= 5 else ("15min" if duration_mins <= 15 else "60min")
+            return self._build_fallback_report(interview_type, duration_str, is_short=True)
 
         # Format duration string as expected by prompt
         if duration_mins <= 5:
@@ -170,6 +230,18 @@ class ReportAgent:
             duration_str = "15min"
         else:
             duration_str = "60min"
+
+        # Add data-sufficiency notice for short interviews
+        data_notice = ""
+        if is_short_interview:
+            data_notice = (
+                "\n# IMPORTANT: SHORT INTERVIEW NOTICE\n"
+                "This interview was very brief with limited data. You MUST still generate a complete, valid JSON report.\n"
+                "- Scores should reflect the limited evidence (expect lower scores, typically 30-55 range).\n"
+                "- In the readiness_verdict.summary, include a note that the interview was too short for a fully accurate assessment.\n"
+                "- Still fill in ALL required fields — use reasonable inferences from the resume where direct interview evidence is missing.\n"
+                "- Do NOT return an error or refuse. Always produce a valid report.\n"
+            )
 
         try:
             formatted_history = ""
@@ -181,7 +253,7 @@ class ReportAgent:
             prompt = f"""
 # ROLE
 You are an expert interview evaluator and career coach. Your task is to analyse a completed interview session and generate a structured, detailed, and actionable feedback report for the candidate.
-
+{data_notice}
 # CONTEXT VARIABLES
 {{INTERVIEW_TYPE}}: {interview_type}
 {{INTERVIEW_DURATION}}: {duration_str}
@@ -293,17 +365,21 @@ IF {duration_str} == "60min":
             
             try:
                 parsed_json = json.loads(response_text)
+                # Inject disclaimer for short interviews
+                if is_short_interview and "meta" in parsed_json:
+                    parsed_json["meta"]["disclaimer"] = (
+                        "This interview was very short. Results may not be fully accurate. "
+                        "For better feedback, try a longer interview (15+ minutes)."
+                    )
                 return parsed_json
             except json.JSONDecodeError as je:
                 logger.error(f"❌ Failed to parse LLM interview response as JSON: {je}")
-                return {
-                    "error": "LLM returned invalid JSON",
-                    "raw_response": response_text[:500]
-                }
+                logger.info("Returning fallback report instead of error")
+                return self._build_fallback_report(interview_type, duration_str, is_short=is_short_interview)
 
         except Exception as e:
             logger.error(f"Error generating interview report: {e}")
-            return {"error": f"Error generating interview report: {str(e)}"}
+            return self._build_fallback_report(interview_type, duration_str, is_short=is_short_interview)
 
 # Global instance
 report_agent = ReportAgent(

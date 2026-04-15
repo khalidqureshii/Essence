@@ -47,6 +47,17 @@ const EVALUATION_SECTIONS = [
   { key: "RESULTS", label: "Results / Report" }
 ] as const;
 
+const RESUME_SECTION_LABELS: Record<string, string> = {
+  INITIAL: "Introduction",
+  EXPERIENCE: "Experience",
+  SKILLS: "Skills",
+  PROJECTS: "Projects Focus",
+  EDUCATION: "Education",
+  EXTRA_CURRICULARS: "Extra Curriculars",
+  HR: "HR & Behavioral",
+  COMPLETED: "Completed"
+};
+
 type EvaluationSectionKey = typeof EVALUATION_SECTIONS[number]["key"];
 
 interface EvaluationState {
@@ -266,7 +277,7 @@ const App: React.FC = () => {
     },
   ]);
   const [appMode, setAppMode] = useState<"project" | "resume" | null>(null);
-  const [setupStep, setSetupStep] = useState<"mode" | "resume_focus" | "resume_time" | "autoplay_config" | "resume_upload" | "complete">("mode");
+  const [setupStep, setSetupStep] = useState<"mode" | "resume_focus" | "time_select" | "autoplay_config" | "resume_upload" | "complete">("mode");
   const [resumeParsedText, setResumeParsedText] = useState("");
   const [interviewTimeLimit, setInterviewTimeLimit] = useState<number>(15);
   const [interviewFocus, setInterviewFocus] = useState<string>("general");
@@ -286,42 +297,7 @@ const App: React.FC = () => {
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(false)
   const [reportGenerationCount, setReportGenerationCount] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [hasConcluded, setHasConcluded] = useState(false);
-
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    if (setupStep === "complete" && appMode === "resume") {
-      interval = setInterval(() => {
-        setTimeRemaining(prev => {
-          if (prev === null) return null;
-          if (prev <= 0) {
-            clearInterval(interval);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [setupStep, appMode]);
-
-  useEffect(() => {
-    if (timeRemaining === 0 && !hasConcluded && appMode === "resume" && setupStep === "complete") {
-      // If the timer is 0 and there is no active input/speaking, conclude the interview automatically
-      if (!isRecording && status === "INACTIVE" && currentDraft.trim() === "" && pendingImage.length === 0) {
-        setHasConcluded(true);
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-           wsRef.current.send(JSON.stringify({ 
-             type: "text_input", 
-             text: "[System] The interview time has expired. The user has not provided further input and is idle. Please conclude the interview immediately using a standard closing line. Do not ask any further questions.",
-             mode: "append" 
-           }));
-           wsRef.current.send(JSON.stringify({ type: "commit" }));
-        }
-      }
-    }
-  }, [timeRemaining, hasConcluded, appMode, setupStep, isRecording, status, currentDraft, pendingImage]);
 
   const [evaluationState, dispatchEvaluation] = useReducer(evaluationReducer, {
     currentSectionIndex: 0,
@@ -996,7 +972,7 @@ const App: React.FC = () => {
     setPendingImage([]);
     setReport(null);
     setReportGenerationCount(0);
-    setTimeRemaining(null);
+
     setHasConcluded(false);
     setShowCompletionModal(false);
     lastAutoplayMessageIdRef.current = null;
@@ -1034,7 +1010,7 @@ const App: React.FC = () => {
         toast.success("Resume processed successfully! Starting interview...", { id: toastId });
         
         setSetupStep("complete");
-        setTimeRemaining(interviewTimeLimit * 60);
+
         setMessages(prev => [
             ...prev,
             { id: crypto.randomUUID(), sender: "user", text: "Uploaded Resume ✅", isFinal: true }
@@ -1109,13 +1085,8 @@ const App: React.FC = () => {
     }
 
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      if (timeRemaining === 0 && !hasConcluded && appMode === "resume" && setupStep === "complete") {
-         setHasConcluded(true);
-         wsRef.current.send(JSON.stringify({ 
-           type: "text_input", 
-           text: " [System] The interview time has expired. Please address the user's response concisely and then immediately conclude the interview with a closing line. Do not ask any further questions.", 
-           mode: "append" 
-         }));
+      if (false) { // Timer-based conclude removed — progress bar is the only indicator
+         setHasConcluded(true);       
       }
       console.log("🚀 Sending commit to backend");
       wsRef.current.send(JSON.stringify({ type: "commit" }));
@@ -1297,8 +1268,15 @@ const App: React.FC = () => {
       console.log("📦 Raw response data:", JSON.stringify(data).slice(0, 500))
       
       if (data.error) {
-        console.error("❌ Backend returned error:", data.error, data.raw_response)
+        console.error("❌ Backend returned top-level error:", data.error, data.raw_response)
         toast.error(`Report generation failed: ${data.error}`)
+        return
+      }
+
+      // Also check if the nested report object has an error
+      if (data.report && data.report.error) {
+        console.error("❌ Backend report object has error:", data.report.error)
+        toast.error(`Report generation failed: ${data.report.error}`)
         return
       }
 
@@ -1326,21 +1304,12 @@ const App: React.FC = () => {
 
   const handleSelectProjectMode = () => {
     setAppMode("project");
-    setSetupStep("autoplay_config");
+    setSetupStep("time_select");
     setMessages(prev => [
       ...prev,
       { id: crypto.randomUUID(), sender: "user", text: "Project Mode", isFinal: true },
-      { id: crypto.randomUUID(), sender: "bot", text: "Project Mode selected. Would you like to enable Autoplay for my voice responses?", isFinal: true, isSetupMessage: true }
+      { id: crypto.randomUUID(), sender: "bot", text: "Please select a session duration:", isFinal: true, isSetupMessage: true }
     ]);
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-       wsRef.current.send(JSON.stringify({
-          type: "reset",
-          mode: "project",
-          resume_text: "",
-          focus_mode: "general",
-          time_limit: 15
-       }));
-    }
   };
 
   const handleSelectResumeMode = () => {
@@ -1355,7 +1324,7 @@ const App: React.FC = () => {
 
   const handleSelectFocus = (focus: string, label: string) => {
     setInterviewFocus(focus);
-    setSetupStep("resume_time");
+    setSetupStep("time_select");
     setMessages(prev => [
       ...prev,
       { id: crypto.randomUUID(), sender: "user", text: label, isFinal: true },
@@ -1384,6 +1353,16 @@ const App: React.FC = () => {
         { id: crypto.randomUUID(), sender: "user", text: enable ? "Enable Autoplay" : "Keep Autoplay Off", isFinal: true },
         { id: crypto.randomUUID(), sender: "bot", text: "Please share your project details (repo link, description, etc.) to get started. Click the Mic when you're ready.", isFinal: true, isSetupMessage: true }
       ]);
+      // Send reset with time_limit for project mode
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+         wsRef.current.send(JSON.stringify({
+            type: "reset",
+            mode: "project",
+            resume_text: "",
+            focus_mode: "general",
+            time_limit: interviewTimeLimit
+         }));
+      }
     } else {
       setSetupStep("resume_upload");
       setMessages(prev => [
@@ -1426,7 +1405,7 @@ const App: React.FC = () => {
       );
     }
 
-    if (setupStep === "resume_time") {
+    if (setupStep === "time_select") {
       return (
         <div className="flex flex-row space-x-3 mt-1">
           <button onClick={() => handleSelectTime(1)} className={btnClass}>
@@ -1490,7 +1469,7 @@ const App: React.FC = () => {
 
   const currentSectionLabel =
     appMode === "resume" && serverProgressData
-      ? serverProgressData.section
+      ? (RESUME_SECTION_LABELS[serverProgressData.section] || serverProgressData.section)
       : EVALUATION_SECTIONS.find(section => section.key === evaluationState.currentSection)?.label ?? EVALUATION_SECTIONS[0].label;
 
   const currentMacroChunks = appMode === "resume" && serverProgressData
@@ -1522,7 +1501,6 @@ const App: React.FC = () => {
         sectionLabel={currentSectionLabel}
         sectionProgress={currentSectionProgress}
         isModeLocked={setupStep === "complete"}
-        timeRemaining={timeRemaining}
         onToggleSidebar={() => setIsSidebarOpen(true)}
       />
 
@@ -1532,6 +1510,7 @@ const App: React.FC = () => {
         macroCompletedChunks={serverProgressData ? serverProgressData.macro_completed_chunks : evaluationState.completedSections}
         sectionLabel={currentSectionLabel}
         sectionProgress={currentSectionProgress}
+        appMode={appMode}
       />
 
       {showCompletionModal && (
@@ -1565,7 +1544,7 @@ const App: React.FC = () => {
         <div ref={chatEndRef} />
 
         {/* See Feedback Button */}
-        {(hasConcluded || (appMode === "resume" && serverProgressData?.section === "COMPLETED")) && status !== "RESPONDING" && (
+        {(hasConcluded || serverProgressData?.section === "COMPLETED" || serverProgressData?.section === "Evaluation Completed" || (appMode === "project" && evaluationState.currentSection === "RESULTS")) && status !== "RESPONDING" && (
            <div className="flex justify-center mt-8 animate-in fade-in slide-in-from-bottom pb-8">
              <button
                onClick={generateReport}
@@ -1585,7 +1564,7 @@ const App: React.FC = () => {
         )}
 
         {/* Context Preview Indicator - Always show if image pending or active */}
-        {!(hasConcluded || serverProgressData?.section === "COMPLETED") && (status === "ACTIVE" || status === "RESPONDING" || pendingImage.length > 0) && (
+        {!(hasConcluded || serverProgressData?.section === "COMPLETED" || serverProgressData?.section === "Evaluation Completed" || (appMode === "project" && evaluationState.currentSection === "RESULTS")) && (status === "ACTIVE" || status === "RESPONDING" || pendingImage.length > 0) && (
           <div className="fixed bottom-24 right-4 flex flex-col items-end space-y-2 animate-in fade-in slide-in-from-bottom-2 z-50">
             {pendingImage.length > 0 && (
               <div className="flex gap-2">
@@ -1636,7 +1615,7 @@ const App: React.FC = () => {
           onStopSharing={stopScreenShare}
           isRecording={isRecording}
           isSharing={isSharing}
-          disabled={status === "RESPONDING" || hasConcluded || (appMode === "resume" && serverProgressData?.section === "COMPLETED")}
+          disabled={status === "RESPONDING" || hasConcluded || serverProgressData?.section === "COMPLETED" || serverProgressData?.section === "Evaluation Completed" || (appMode === "project" && evaluationState.currentSection === "RESULTS")}
         />
         <div className="text-xs text-muted-foreground text-center mt-2">
           Click Mic to start and stop recording

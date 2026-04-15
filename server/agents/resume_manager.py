@@ -4,9 +4,12 @@ from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 
 class ResumeConversationState(Enum):
     INITIAL = auto()           
-    SKILLS = auto()  
     EXPERIENCE = auto()
+    SKILLS = auto()  
     PROJECTS = auto()
+    EDUCATION = auto()
+    EXTRA_CURRICULARS = auto()
+    HR = auto()
     COMPLETED = auto()
 
 class ResumeConversationManager:
@@ -36,9 +39,9 @@ class ResumeConversationManager:
         else:
             self.state = ResumeConversationState.INITIAL
 
-        # roughly base limit on time (average 3 mins per question set)
-        total_questions = max(3, self.time_limit_mins // 2)
-        self.max_questions_per_state = max(1, total_questions // 3)
+        # roughly base limit on time (average 1.5 mins per question)
+        total_questions = max(7, int(self.time_limit_mins // 1.5))
+        self.max_questions_per_state = max(1, total_questions // 7)
 
     def update_history(self, user_text: str, ai_text: str):
         if user_text.strip():
@@ -69,6 +72,12 @@ class ResumeConversationManager:
                 "STATE: INITIAL INTRODUCTION\n"
                 "- Greet the candidate and ask them to briefly introduce themselves highlighting their background from the resume.\n"
             )
+        elif self.state == ResumeConversationState.EXPERIENCE:
+            state_specific = (
+                "STATE: EVALUATING EXPERIENCE / WORK HISTORY\n"
+                "- Ask about a specific past role or responsibility listed in the resume.\n"
+                "- Focus on what challenges they faced or what impact they had.\n"
+            )
         elif self.state == ResumeConversationState.SKILLS:
             state_specific = (
                 "STATE: EVALUATING SKILLS\n"
@@ -76,17 +85,29 @@ class ResumeConversationManager:
                 "- Ask a situational or deep-dive question about their experience with this skill.\n"
                 "- Do NOT ask more than one question.\n"
             )
-        elif self.state == ResumeConversationState.EXPERIENCE:
-            state_specific = (
-                "STATE: EVALUATING EXPERIENCE / WORK HISTORY\n"
-                "- Ask about a specific past role or responsibility listed in the resume.\n"
-                "- Focus on what challenges they faced or what impact they had.\n"
-            )
         elif self.state == ResumeConversationState.PROJECTS:
             state_specific = (
                 "STATE: EVALUATING PROJECTS\n"
                 "- Ask about a specific project they built or participated in, sourced from their resume.\n"
                 "- Ask about the technical choices they made or obstacles they overcame.\n"
+            )
+        elif self.state == ResumeConversationState.EDUCATION:
+            state_specific = (
+                "STATE: EVALUATING EDUCATION\n"
+                "- Ask a question related to their educational background, degrees, or coursework mentioned.\n"
+                "- If no education is listed, ask broadly about how their learning background prepared them for this field.\n"
+            )
+        elif self.state == ResumeConversationState.EXTRA_CURRICULARS:
+            state_specific = (
+                "STATE: EVALUATING EXTRA CURRICULARS & LEADERSHIP\n"
+                "- Ask about any clubs, volunteer work, or extracurricular leadership roles mentioned.\n"
+                "- If none are listed, ask about how they stay engaged with the tech community or collaborate outside of work.\n"
+            )
+        elif self.state == ResumeConversationState.HR:
+            state_specific = (
+                "STATE: HR & BEHAVIORAL\n"
+                "- Ask a classic behavioral or cultural-fit question (e.g., handling conflicts, teamwork, greatest strengths/weaknesses).\n"
+                "- Tie it to the general theme of their resume if possible.\n"
             )
         elif self.state == ResumeConversationState.COMPLETED:
             state_specific = (
@@ -121,14 +142,20 @@ class ResumeConversationManager:
             elif self.focus_mode == "projects":
                 self.state = ResumeConversationState.COMPLETED
             else:
-                # General flow: INITIAL -> SKILLS -> PROJECTS -> EXPERIENCE -> COMPLETED
+                # General flow: INITIAL -> EXPERIENCE -> SKILLS -> PROJECTS -> EDUCATION -> EXTRA_CURRICULARS -> HR -> COMPLETED
                 if self.state == ResumeConversationState.INITIAL:
+                    self.state = ResumeConversationState.EXPERIENCE
+                elif self.state == ResumeConversationState.EXPERIENCE:
                     self.state = ResumeConversationState.SKILLS
                 elif self.state == ResumeConversationState.SKILLS:
                     self.state = ResumeConversationState.PROJECTS
                 elif self.state == ResumeConversationState.PROJECTS:
-                    self.state = ResumeConversationState.EXPERIENCE
-                elif self.state == ResumeConversationState.EXPERIENCE:
+                    self.state = ResumeConversationState.EDUCATION
+                elif self.state == ResumeConversationState.EDUCATION:
+                    self.state = ResumeConversationState.EXTRA_CURRICULARS
+                elif self.state == ResumeConversationState.EXTRA_CURRICULARS:
+                    self.state = ResumeConversationState.HR
+                elif self.state == ResumeConversationState.HR:
                     self.state = ResumeConversationState.COMPLETED
 
     def get_progress_data(self):
